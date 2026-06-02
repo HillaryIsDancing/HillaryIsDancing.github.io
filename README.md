@@ -1,4 +1,4 @@
-# HILL'S KPOP COVERS
+# HILL'S KPOP ARCHIVE
 > *archive · search · data*
 
 ```
@@ -13,7 +13,6 @@ K P O P   C O V E R S   A R C H I V E
 
 ![version](https://img.shields.io/badge/version-1.0.0-c9a84c?style=flat-square&labelColor=0a0a0a)
 ![license](https://img.shields.io/badge/license-MIT-555?style=flat-square&labelColor=0a0a0a)
-![kpop](https://img.shields.io/badge/kpop-nerdy-c9a84c?style=flat-square&labelColor=0a0a0a)
 
 ---
 
