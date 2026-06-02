@@ -458,7 +458,7 @@ h1 {
     min-height: 108px;
     aspect-ratio: auto;
     object-fit: cover;
-    transform: scale(1.12);
+    transform: scale(1.18);
     transform-origin: center;
   }
 
