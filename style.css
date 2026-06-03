@@ -152,7 +152,6 @@ h1 {
   box-shadow: 0 10px 24px rgba(221, 181, 199, 0.18);
   position: relative;
 
-  /* Added: make every card internally stretch vertically */
   display: flex;
   flex-direction: column;
 }
@@ -174,7 +173,6 @@ h1 {
 .card-content {
   padding: 16px 16px 18px;
 
-  /* Added: allow button to be pushed to the bottom */
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -199,11 +197,16 @@ h1 {
   color: #8e6f7f;
   font-size: 14px;
   line-height: 1.55;
+
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .role {
   display: inline-block;
-  margin-top: 8px;
+  width: fit-content;
+  margin-top: auto;
   padding: 5px 9px;
   border-radius: 999px;
   background: #fff0f7;
@@ -214,6 +217,8 @@ h1 {
 
 .watch {
   display: inline-block;
+  align-self: flex-start;
+  margin-top: 14px;
   padding: 10px 16px;
   border-radius: 999px;
   background: linear-gradient(135deg, #ff8fc2, #f5a1ca);
@@ -222,10 +227,6 @@ h1 {
   font-weight: bold;
   font-size: 14px;
   box-shadow: 0 8px 18px rgba(232, 141, 185, 0.26);
-
-  /* Added: align buttons at the bottom of each card */
-  align-self: flex-start;
-  margin-top: auto;
 }
 
 .watch:hover {
@@ -459,6 +460,8 @@ h1 {
   }
 
   .meta {
+    display: block;
+    flex: initial;
     font-size: 12px;
     line-height: 1.35;
   }
