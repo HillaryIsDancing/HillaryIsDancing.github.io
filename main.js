@@ -288,6 +288,14 @@ function renderBoard(container, counts, type) {
 
 function renderRoleBoard(container, counts) {
   const sortedItems = Object.entries(counts).sort((a, b) => {
+    const aIsBackup = a[1].isBackup;
+    const bIsBackup = b[1].isBackup;
+
+    // Backup 永远排最后
+    if (aIsBackup && !bIsBackup) return 1;
+    if (!aIsBackup && bIsBackup) return -1;
+
+    // 其他角色正常按视频数量排序
     return b[1].total - a[1].total || a[1].role.localeCompare(b[1].role);
   });
 
@@ -300,7 +308,11 @@ function renderRoleBoard(container, counts) {
 
   sortedItems.forEach(([roleKey, data]) => {
     const button = document.createElement("button");
-    button.className = `artist-block ${getBoardBlockSize(data.total)}`;
+
+    // Backup 永远使用 small 样式，和 1 video 的卡片一样
+    const blockSize = data.isBackup ? "small" : getBoardBlockSize(data.total);
+
+    button.className = `artist-block ${blockSize}`;
     button.type = "button";
 
     button.title = data.isBackup
