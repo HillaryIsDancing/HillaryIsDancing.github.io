@@ -107,9 +107,26 @@ function normalizeArtistName(name) {
 }
 
 function normalizeRoleName(role) {
-  return String(role)
+  const raw = String(role)
     .replace(/\s+/g, " ")
     .trim();
+
+  const key = raw.toLowerCase();
+
+  const backupAliases = [
+    "backup",
+    "back up",
+    "back-up",
+    "backup dancer",
+    "back up dancer",
+    "back-up dancer"
+  ];
+
+  if (backupAliases.includes(key)) {
+    return "Backup";
+  }
+
+  return raw;
 }
 
 function sortByNewestDate(a, b) {
@@ -209,17 +226,22 @@ function renderRoleMap(list) {
 
   list.forEach((item) => {
     const artist = item.artist || "Unknown Artist";
-    const role = item.dancerRole || "";
+    const role = normalizeRoleName(item.dancerRole || "");
 
     if (!role) return;
 
-    const roleKey = `${artist}|||${role}`;
+    const isBackup = role.toLowerCase() === "backup";
+
+    const roleKey = isBackup
+      ? "ALL|||Backup"
+      : `${artist}|||${role}`;
 
     if (!roleCounts[roleKey]) {
       roleCounts[roleKey] = {
-        artist,
-        role,
-        total: 0
+        artist: isBackup ? "All Artists" : artist,
+        role: isBackup ? "Backup" : role,
+        total: 0,
+        isBackup
       };
     }
 
@@ -280,7 +302,10 @@ function renderRoleBoard(container, counts) {
     const button = document.createElement("button");
     button.className = `artist-block ${getBoardBlockSize(data.total)}`;
     button.type = "button";
-    button.title = `${data.artist} - ${data.role}`;
+
+    button.title = data.isBackup
+      ? "Backup dancer"
+      : `${data.artist} - ${data.role}`;
 
     button.innerHTML = `
       <span class="artist-block-name">${escapeHtml(data.role)}</span>
@@ -308,7 +333,13 @@ function filterByRoleKey(roleKey) {
 
   currentList = videos
     .filter((item) => {
-      return item.artist === artist && item.dancerRole === role;
+      const itemRole = normalizeRoleName(item.dancerRole || "");
+
+      if (artist === "ALL" && role === "Backup") {
+        return itemRole.toLowerCase() === "backup";
+      }
+
+      return item.artist === artist && itemRole === role;
     })
     .sort(sortByNewestDate);
 
