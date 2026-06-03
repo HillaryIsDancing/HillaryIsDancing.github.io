@@ -437,16 +437,40 @@ function getBoardBlockSize(total) {
 }
 
 function searchVideos() {
-  const keyword = searchInput.value.trim().toLowerCase();
+  const rawKeyword = searchInput.value.trim();
+  const keyword = rawKeyword.toLowerCase();
+
+  if (!keyword) {
+    currentList = videos;
+    visibleCount = PAGE_SIZE;
+    renderVideos(currentList);
+    return;
+  }
+
+  const normalizedArtistKeyword = normalizeArtistName(rawKeyword);
+
+  const isExactArtistSearch = videos.some((item) => {
+    return item.artist === normalizedArtistKeyword;
+  });
 
   currentList = videos
     .filter((item) => {
+      const artist = item.artist || "";
+      const songTitle = item.songTitle || "";
+      const location = item.location || "";
+      const performanceDate = item.performanceDate || "";
+      const dancerRole = item.dancerRole || "";
+
+      if (isExactArtistSearch) {
+        return artist === normalizedArtistKeyword;
+      }
+
       return (
-        item.artist?.toLowerCase().includes(keyword) ||
-        item.songTitle?.toLowerCase().includes(keyword) ||
-        item.location?.toLowerCase().includes(keyword) ||
-        item.performanceDate?.toLowerCase().includes(keyword) ||
-        item.dancerRole?.toLowerCase().includes(keyword)
+        artist.toLowerCase().includes(keyword) ||
+        songTitle.toLowerCase().includes(keyword) ||
+        location.toLowerCase().includes(keyword) ||
+        performanceDate.toLowerCase().includes(keyword) ||
+        dancerRole.toLowerCase().includes(keyword)
       );
     })
     .sort(sortByNewestDate);
