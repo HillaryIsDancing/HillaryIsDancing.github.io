@@ -104,7 +104,12 @@ function normalizeArtistName(name) {
     "fiestar": "FIESTAR",
     "jennie": "JENNIE",
     "lee chae yeon": "LEE CHAE YEON",
-    "clc": "CLC"
+    "clc": "CLC",
+    "chocome": "CHOCOME",
+    "wjsn chocome": "CHOCOME",    
+    "yeji x giselle x julie": "YEJI X GISELLE X JULIE",
+    "yeji giselle julie": "YEJI X GISELLE X JULIE",
+    "yeji x giselle x julie toxic": "YEJI X GISELLE X JULIE"
   };
 
   return aliasMap[key] || raw;
@@ -166,12 +171,21 @@ function getRoleIdentityKey(artist, role) {
   const identityAliasMap = {
     "IZ*ONE|||Sakura": "Sakura",
     "LE SSERAFIM|||Sakura": "Sakura",
-
+  
     "GFRIEND|||Eunha": "Eunha",
     "VIVIZ|||Eunha": "Eunha",
-
+  
     "TWICE|||Sana": "Sana",
-    "MISAMO|||Sana": "Sana"
+    "MISAMO|||Sana": "Sana",
+  
+    "IZ*ONE|||Wonyoung": "Wonyoung",
+    "IVE|||Wonyoung": "Wonyoung",
+  
+    "WJSN Cosmic Girls|||Dayoung": "Dayoung",
+    "CHOCOME|||Dayoung": "Dayoung",
+  
+    "KISS OF LIFE|||Julie": "Julie",
+    "YEJI X GISELLE X JULIE|||Julie": "Julie"
   };
 
   return identityAliasMap[groupMemberKey] || groupMemberKey;
