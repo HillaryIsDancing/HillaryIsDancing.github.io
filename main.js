@@ -66,8 +66,11 @@ function normalizeArtistName(name) {
     "twice": "TWICE",
     "blackpink": "BLACKPINK",
     "aespa": "AESPA",
+    "aspea": "AESPA",
     "le sserafim": "LE SSERAFIM",
+    "le seerafim": "LE SSERAFIM",
     "gfriend": "GFRIEND",
+    "viviz": "VIVIZ",
     "kiss of life": "KISS OF LIFE",
     "fifty fifty": "FIFTY FIFTY",
     "newjeans": "NewJeans",
@@ -76,6 +79,7 @@ function normalizeArtistName(name) {
     "wjsn": "WJSN Cosmic Girls",
     "girls' generation": "Girls' Generation",
     "iz*one": "IZ*ONE",
+    "izone": "IZ*ONE",
     "produce 48": "PRODUCE 48",
     "purple kiss": "Purple Kiss",
     "dreamcatcher": "Dreamcatcher",
@@ -126,7 +130,63 @@ function normalizeRoleName(role) {
     return "Backup";
   }
 
-  return raw;
+  const roleAliasMap = {
+    "ningning": "Ningning",
+    "ning ning": "Ningning",
+    "ning ning ": "Ningning",
+
+    "dahyun": "Dahyun",
+    "da hyun": "Dahyun",
+    "da-hyun": "Dahyun",
+
+    "yoohyeon": "Yoohyeon",
+    "yoo hyeon": "Yoohyeon",
+    "yoo-hyeon": "Yoohyeon",
+
+    "sana": "Sana",
+    "sakura": "Sakura",
+    "eunha": "Eunha"
+  };
+
+  return roleAliasMap[key] || raw;
+}
+
+function getRoleIdentityKey(artist, role) {
+  const normalizedArtist = normalizeArtistName(artist || "Unknown Artist");
+  const normalizedRole = normalizeRoleName(role || "");
+
+  if (!normalizedRole) return "";
+
+  if (normalizedRole.toLowerCase() === "backup") {
+    return "BACKUP";
+  }
+
+  const groupMemberKey = `${normalizedArtist}|||${normalizedRole}`;
+
+  const identityAliasMap = {
+    "IZ*ONE|||Sakura": "Sakura",
+    "LE SSERAFIM|||Sakura": "Sakura",
+
+    "GFRIEND|||Eunha": "Eunha",
+    "VIVIZ|||Eunha": "Eunha",
+
+    "TWICE|||Sana": "Sana",
+    "MISAMO|||Sana": "Sana"
+  };
+
+  return identityAliasMap[groupMemberKey] || groupMemberKey;
+}
+
+function getRoleDisplayName(identityKey, role) {
+  if (identityKey === "BACKUP") {
+    return "Backup";
+  }
+
+  if (!identityKey.includes("|||")) {
+    return identityKey;
+  }
+
+  return normalizeRoleName(role || "");
 }
 
 function sortByNewestDate(a, b) {
@@ -181,7 +241,7 @@ function renderVideos(list) {
 
             <a 
               class="watch" 
-              href="${escapeHtml(item.youtubeUrl)}" 
+              href="${escapeHtml(item.youtubeUrl || "#")}" 
               target="_blank" 
               rel="noopener noreferrer"
             >
@@ -230,22 +290,22 @@ function renderRoleMap(list) {
 
     if (!role) return;
 
-    const isBackup = role.toLowerCase() === "backup";
+    const identityKey = getRoleIdentityKey(artist, role);
+    if (!identityKey) return;
 
-    const roleKey = isBackup
-      ? "ALL|||Backup"
-      : `${artist}|||${role}`;
+    const isBackup = identityKey === "BACKUP";
+    const displayName = getRoleDisplayName(identityKey, role);
 
-    if (!roleCounts[roleKey]) {
-      roleCounts[roleKey] = {
-        artist: isBackup ? "All Artists" : artist,
-        role: isBackup ? "Backup" : role,
+    if (!roleCounts[identityKey]) {
+      roleCounts[identityKey] = {
+        identityKey,
+        role: displayName,
         total: 0,
         isBackup
       };
     }
 
-    roleCounts[roleKey].total += 1;
+    roleCounts[identityKey].total += 1;
   });
 
   renderRoleBoard(roleMap, roleCounts);
@@ -291,11 +351,9 @@ function renderRoleBoard(container, counts) {
     const aIsBackup = a[1].isBackup;
     const bIsBackup = b[1].isBackup;
 
-    // Backup 永远排最后
     if (aIsBackup && !bIsBackup) return 1;
     if (!aIsBackup && bIsBackup) return -1;
 
-    // 其他角色正常按视频数量排序
     return b[1].total - a[1].total || a[1].role.localeCompare(b[1].role);
   });
 
@@ -306,18 +364,14 @@ function renderRoleBoard(container, counts) {
     return;
   }
 
-  sortedItems.forEach(([roleKey, data]) => {
+  sortedItems.forEach(([identityKey, data]) => {
     const button = document.createElement("button");
 
-    // Backup 永远使用 small 样式，和 1 video 的卡片一样
     const blockSize = data.isBackup ? "small" : getBoardBlockSize(data.total);
 
     button.className = `artist-block ${blockSize}`;
     button.type = "button";
-
-    button.title = data.isBackup
-      ? "Backup dancer"
-      : `${data.artist} - ${data.role}`;
+    button.title = data.isBackup ? "Backup dancer" : data.role;
 
     button.innerHTML = `
       <span class="artist-block-name">${escapeHtml(data.role)}</span>
@@ -327,7 +381,7 @@ function renderRoleBoard(container, counts) {
     `;
 
     button.addEventListener("click", () => {
-      filterByRoleKey(roleKey);
+      filterByRoleIdentityKey(identityKey);
       window.scrollTo({
         top: document.querySelector(".toolbar").offsetTop,
         behavior: "smooth"
@@ -338,20 +392,23 @@ function renderRoleBoard(container, counts) {
   });
 }
 
-function filterByRoleKey(roleKey) {
-  const [artist, role] = roleKey.split("|||");
+function filterByRoleIdentityKey(identityKey) {
+  const isBackup = identityKey === "BACKUP";
+  const displayRole = isBackup
+    ? "Backup"
+    : identityKey.includes("|||")
+      ? identityKey.split("|||")[1]
+      : identityKey;
 
-  searchInput.value = role;
+  searchInput.value = displayRole;
 
   currentList = videos
     .filter((item) => {
+      const itemArtist = item.artist || "Unknown Artist";
       const itemRole = normalizeRoleName(item.dancerRole || "");
+      const itemIdentityKey = getRoleIdentityKey(itemArtist, itemRole);
 
-      if (artist === "ALL" && role === "Backup") {
-        return itemRole.toLowerCase() === "backup";
-      }
-
-      return item.artist === artist && itemRole === role;
+      return itemIdentityKey === identityKey;
     })
     .sort(sortByNewestDate);
 
