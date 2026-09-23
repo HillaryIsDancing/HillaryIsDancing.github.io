@@ -378,24 +378,94 @@ function renderRoleBoard(container, counts) {
     return;
   }
 
-  sortedItems.forEach(([identityKey, data]) => {
+  // =========================
+  // TOP 3 PODIUM
+  // =========================
+
+  const topThree = sortedItems.slice(0, 3);
+  const remainingItems = sortedItems.slice(3);
+
+  const podium = document.createElement("div");
+  podium.className = "role-podium";
+
+  // Podium visual order: 2nd -> 1st -> 3rd
+  const podiumOrder = [
+    { index: 1, rank: 2, medal: "🥈" },
+    { index: 0, rank: 1, medal: "🥇" },
+    { index: 2, rank: 3, medal: "🥉" }
+  ];
+
+  podiumOrder.forEach(({ index, rank, medal }) => {
+    const item = topThree[index];
+
+    if (!item) return;
+
+    const [identityKey, data] = item;
+
+    const button = document.createElement("button");
+    button.className = `podium-card podium-rank-${rank}`;
+    button.type = "button";
+    button.title = data.isBackup ? "Backup dancer" : data.role;
+
+    button.innerHTML = `
+      <span class="podium-medal">${medal}</span>
+
+      <span class="podium-role">
+        ${escapeHtml(data.role)}
+      </span>
+
+      <span class="podium-count">
+        ${data.total} video${data.total === 1 ? "" : "s"}
+      </span>
+
+      <span class="podium-number">
+        ${rank}
+      </span>
+    `;
+
+    button.addEventListener("click", () => {
+      filterByRoleIdentityKey(identityKey);
+
+      window.scrollTo({
+        top: document.querySelector(".toolbar").offsetTop,
+        behavior: "smooth"
+      });
+    });
+
+    podium.appendChild(button);
+  });
+
+  container.appendChild(podium);
+
+  // =========================
+  // 4TH PLACE AND BELOW
+  // keep original appearance
+  // =========================
+
+  remainingItems.forEach(([identityKey, data]) => {
     const button = document.createElement("button");
 
-    const blockSize = data.isBackup ? "small" : getBoardBlockSize(data.total);
+    const blockSize = data.isBackup
+      ? "small"
+      : getBoardBlockSize(data.total);
 
     button.className = `artist-block ${blockSize}`;
     button.type = "button";
     button.title = data.isBackup ? "Backup dancer" : data.role;
 
     button.innerHTML = `
-      <span class="artist-block-name">${escapeHtml(data.role)}</span>
-      <span class="artist-block-count">${data.total} video${
-        data.total === 1 ? "" : "s"
-      }</span>
+      <span class="artist-block-name">
+        ${escapeHtml(data.role)}
+      </span>
+
+      <span class="artist-block-count">
+        ${data.total} video${data.total === 1 ? "" : "s"}
+      </span>
     `;
 
     button.addEventListener("click", () => {
       filterByRoleIdentityKey(identityKey);
+
       window.scrollTo({
         top: document.querySelector(".toolbar").offsetTop,
         behavior: "smooth"
