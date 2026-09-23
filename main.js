@@ -350,11 +350,16 @@ function renderBoard(container, counts, type) {
     button.addEventListener("click", () => {
       searchInput.value = name;
       searchVideos();
+
+  // Collapse Artist Board
+      artistMapSection.classList.add("hidden");
+      toggleArtistMapButton.textContent = "Show Artist Board 🧸";
+
       window.scrollTo({
         top: document.querySelector(".toolbar").offsetTop,
         behavior: "smooth"
-      });
-    });
+  });
+});
 
     container.appendChild(button);
   });
@@ -426,11 +431,15 @@ function renderRoleBoard(container, counts) {
     button.addEventListener("click", () => {
       filterByRoleIdentityKey(identityKey);
 
+      // Collapse Role Board
+      roleMapSection.classList.add("hidden");
+      toggleRoleMapButton.textContent = "Show Role Board 🎀";
+    
       window.scrollTo({
         top: document.querySelector(".toolbar").offsetTop,
         behavior: "smooth"
-      });
-    });
+  });
+});
 
     podium.appendChild(button);
   });
@@ -465,7 +474,11 @@ function renderRoleBoard(container, counts) {
 
     button.addEventListener("click", () => {
       filterByRoleIdentityKey(identityKey);
-
+    
+      // Collapse Role Board
+      roleMapSection.classList.add("hidden");
+      toggleRoleMapButton.textContent = "Show Role Board 🎀";
+    
       window.scrollTo({
         top: document.querySelector(".toolbar").offsetTop,
         behavior: "smooth"
