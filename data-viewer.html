@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <title>Hindex Data Viewer</title>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #fff9fb;
+      --panel: #ffffff;
+      --panel-soft: #fff1f5;
+      --panel-soft-2: #f8f4ff;
+      --text: #2d2330;
+      --muted: #7c6c78;
+      --border: #eadde5;
+      --accent: #d95f8d;
+      --accent-strong: #b83f70;
+      --accent-soft: #fde4ee;
+      --green: #3f8f6b;
+      --green-soft: #e4f5ec;
+      --orange: #b87333;
+      --orange-soft: #fff0df;
+      --red: #b84f5e;
+      --red-soft: #fde8eb;
+      --purple: #7956a8;
+      --purple-soft: #f0e8fb;
+      --shadow: 0 10px 28px rgba(88, 53, 72, 0.08);
+      --radius: 20px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #171318;
+        --panel: #211b22;
+        --panel-soft: #2b2025;
+        --panel-soft-2: #25202d;
+        --text: #f7edf2;
+        --muted: #baa8b2;
+        --border: #433641;
+        --accent: #f08bb1;
+        --accent-strong: #ffacd0;
+        --accent-soft: #422635;
+        --green: #7bc49e;
+        --green-soft: #1f392d;
+        --orange: #e4aa6f;
+        --orange-soft: #422f22;
+        --red: #e78a96;
+        --red-soft: #43262d;
+        --purple: #bba0e3;
+        --purple-soft: #322940;
+        --shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+
+    .app {
+      width: min(1500px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 26px 0 56px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 44px);
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      margin: 7px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+      line-height: 1.55;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .button {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 12px;
+      min-height: 42px;
+      padding: 9px 13px;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .button:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+    .button.primary:hover { background: var(--accent-strong); }
+    .button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+    .live-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.ok { background: var(--green); }
+    .dot.loading { background: var(--orange); }
+    .dot.error { background: var(--red); }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 5px 0 14px;
+      scrollbar-width: thin;
+    }
+
+    .tab {
+      white-space: nowrap;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--muted);
+      padding: 10px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .tab.active {
+      color: var(--accent-strong);
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      margin: 4px 0 18px;
+    }
+
+    .metric {
+      padding: 16px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .metric-value { font-size: 28px; font-weight: 900; letter-spacing: -0.04em; }
+    .metric-label { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+    .grid-2 { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(330px, .9fr); gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      min-width: 0;
+    }
+
+    .panel + .panel { margin-top: 14px; }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .panel-title { margin: 0; font-size: 18px; }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+    .tiny { font-size: 11px; }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) 180px 180px;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .toolbar.two { grid-template-columns: minmax(220px, 1fr) 220px; }
+
+    .input, .select {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      color: var(--text);
+      padding: 9px 12px;
+      outline: none;
+    }
+
+    .input:focus, .select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .card-list { display: grid; gap: 9px; }
+
+    .row-card {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 13px 14px;
+      cursor: pointer;
+      transition: .15s ease;
+    }
+
+    .row-card:hover, .row-card.selected {
+      border-color: var(--accent);
+      background: var(--panel-soft);
+    }
+
+    .row-card.selected { box-shadow: inset 3px 0 0 var(--accent); }
+
+    .row-main {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .row-name { font-weight: 850; min-width: 0; overflow-wrap: anywhere; }
+    .row-meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 999px;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 800;
+      background: var(--panel-soft-2);
+      color: var(--purple);
+      border: 1px solid transparent;
+    }
+
+    .badge.active { background: var(--green-soft); color: var(--green); }
+    .badge.former, .badge.disbanded { background: var(--red-soft); color: var(--red); }
+    .badge.reunion { background: var(--purple-soft); color: var(--purple); }
+    .badge.inactive { background: var(--orange-soft); color: var(--orange); }
+    .badge.subunit { background: var(--accent-soft); color: var(--accent-strong); }
+    .badge.warning { background: var(--orange-soft); color: var(--orange); }
+
+    .detail-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .detail-title h2 { margin: 0; font-size: 26px; letter-spacing: -0.03em; }
+    .id-line { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); font-size: 12px; }
+
+    .stat-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .mini-stat {
+      background: var(--panel-soft);
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .mini-stat strong { display: block; font-size: 20px; }
+    .mini-stat span { color: var(--muted); font-size: 11px; }
+
+    .member-section { margin-top: 17px; }
+    .section-label { font-size: 12px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+
+    .member-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .member-chip {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 11px;
+      padding: 8px 10px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .member-chip:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .member-chip.former { border-style: dashed; color: var(--muted); }
+
+    .relation-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+
+    .relation {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel-soft);
+      padding: 7px 9px;
+      font-size: 12px;
+    }
+
+    .note {
+      margin-top: 14px;
+      padding: 11px 12px;
+      border-radius: 12px;
+      background: var(--orange-soft);
+      color: var(--orange);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .person-drawer {
+      margin-top: 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 28px 14px;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+    }
+
+    .project-card, .achievement-card, .review-card {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 16px;
+      padding: 15px;
+    }
+
+    .project-card h3, .achievement-card h3, .review-card h3 { margin: 0 0 5px; font-size: 16px; }
+
+    .progress {
+      width: 100%;
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--panel-soft);
+      margin: 10px 0 6px;
+    }
+
+    .progress > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--accent);
+    }
+
+    .json-box {
+      margin-top: 12px;
+      background: var(--panel-soft-2);
+      border: 1px solid var(--border);
+      padding: 12px;
+      border-radius: 12px;
+      font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      max-height: 330px;
+      overflow: auto;
+    }
+
+    details summary { cursor: pointer; color: var(--accent-strong); font-weight: 750; }
+
+    .integrity-ok {
+      padding: 13px;
+      border-radius: 14px;
+      color: var(--green);
+      background: var(--green-soft);
+      font-weight: 750;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 20px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 1080px) {
+      .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 720px) {
+      .app { width: min(100% - 20px, 1500px); padding-top: 18px; }
+      .topbar { display: block; }
+      .top-actions { justify-content: flex-start; margin-top: 14px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .toolbar, .toolbar.two { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
+      .stat-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Private data tool</div>
+        <h1>Hindex Data Viewer</h1>
+        <p class="subtitle">
+          Inspect groups, people, sub-units, collaborations, achievements and unresolved dance-role mappings without editing the data files by hand.
+        </p>
+      </div>
+
+      <div class="top-actions">
+        <div class="live-status" title="Google Sheet / Apps Script dance data status">
+          <span id="liveDot" class="dot"></span>
+          <span id="liveStatusText">Live dance data not loaded</span>
+        </div>
+        <button id="reloadDanceData" class="button primary" type="button">Load live dance data</button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Data viewer sections">
+      <button class="tab active" type="button" data-page="overview">Overview</button>
+      <button class="tab" type="button" data-page="groups">Groups</button>
+      <button class="tab" type="button" data-page="people">People</button>
+      <button class="tab" type="button" data-page="projects">Projects</button>
+      <button class="tab" type="button" data-page="achievements">Achievements</button>
+      <button class="tab" type="button" data-page="review">Needs Review</button>
+    </nav>
+
+    <section id="page-overview" class="page active"></section>
+    <section id="page-groups" class="page"></section>
+    <section id="page-people" class="page"></section>
+    <section id="page-projects" class="page"></section>
+    <section id="page-achievements" class="page"></section>
+    <section id="page-review" class="page"></section>
+
+    <p class="footer-note">
+      This page is intentionally marked <code>noindex</code>, but if it is hosted inside a public repository/site it is not password-protected. For truly private use, keep it local or host it behind access control.
+    </p>
+  </main>
+
+  <!-- Data layer: load before the viewer logic. -->
+  <script src="data/groups.js"></script>
+  <script src="data/artists.js"></script>
+  <script src="data/dances.js"></script>
+  <script src="data/achievements.js"></script>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const data = window.HID_DATA || {};
+      const groups = data.groups || {};
+      const people = data.people || {};
+      const projects = data.projects || {};
+      const achievements = data.achievements || [];
+
+      const state = {
+        page: "overview",
+        dances: [],
+        danceLoadState: "idle",
+        danceLoadError: "",
+        selectedGroupId: Object.keys(groups)[0] || null,
+        selectedPersonId: null,
+        groupSearch: "",
+        groupStatus: "all",
+        groupKind: "all",
+        personSearch: "",
+        personGroup: "all"
+      };
+
+      const $ = (selector, scope = document) => scope.querySelector(selector);
+      const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function safeArray(value) {
+        return Array.isArray(value) ? value : [];
+      }
+
+      function groupName(id) {
+        return groups[id]?.name || id || "Unknown group";
+      }
+
+      function personName(id) {
+        return people[id]?.name || id || "Unknown person";
+      }
+
+      function getSubunits(groupId) {
+        return Object.values(groups).filter(group => group.parentGroupId === groupId);
+      }
+
+      function statusBadge(status) {
+        const normalized = String(status || "unknown").toLowerCase();
+        return `<span class="badge ${escapeHtml(normalized)}">${escapeHtml(status || "unknown")}</span>`;
+      }
+
+      function kindBadge(kind) {
+        return `<span class="badge ${kind === "subunit" ? "subunit" : ""}">${escapeHtml(kind || "group")}</span>`;
+      }
+
+      function metric(value, label) {
+        return `
+          <div class="metric">
+            <div class="metric-value">${escapeHtml(value)}</div>
+            <div class="metric-label">${escapeHtml(label)}</div>
+          </div>
+        `;
+      }
+
+      function setLiveStatus(type, text) {
+        const dot = $("#liveDot");
+        const label = $("#liveStatusText");
+        dot.className = `dot ${type || ""}`;
+        label.textContent = text;
+      }
+
+      function validateData() {
+        const issues = [];
+        const warnings = [];
+
+        Object.values(groups).forEach(group => {
+          safeArray(group.memberIds).forEach(personId => {
+            if (!people[personId]) {
+              issues.push({
+                type: "Missing person",
+                message: `${group.name} references missing Person ID: ${personId}`,
+                groupId: group.id
+              });
+            }
+          });
+
+          if (group.parentGroupId && !groups[group.parentGroupId]) {
+            issues.push({
+              type: "Missing parent group",
+              message: `${group.name} references missing parent group: ${group.parentGroupId}`,
+              groupId: group.id
+            });
+          }
+
+          if (group.reviewNote) {
+            warnings.push({
+              type: "Group review note",
+              message: `${group.name}: ${group.reviewNote}`,
+              groupId: group.id
+            });
+          }
+        });
+
+        Object.values(projects).forEach(project => {
+          safeArray(project.participantIds).forEach(personId => {
+            if (!people[personId]) {
+              issues.push({
+                type: "Missing project participant",
+                message: `${project.name} references missing Person ID: ${personId}`,
+                projectId: project.id
+              });
+            }
+          });
+        });
+
+        const normalizedNameMap = new Map();
+        Object.values(people).forEach(person => {
+          const key = String(person.name || "").trim().toLowerCase();
+          if (!key) return;
+          if (!normalizedNameMap.has(key)) normalizedNameMap.set(key, []);
+          normalizedNameMap.get(key).push(person.id);
+        });
+
+        normalizedNameMap.forEach((ids, name) => {
+          if (ids.length > 1) {
+            warnings.push({
+              type: "Duplicate display name",
+              message: `“${name}” belongs to multiple Person IDs: ${ids.join(", ")}`,
+              personIds: ids
+            });
+          }
+        });
+
+        safeArray(data.groupReview?.unresolvedPolicyExamples).forEach(example => {
+          warnings.push({ type: "Policy review", message: example });
+        });
+
+        if (state.danceLoadState === "loaded" && data.getUnresolvedDances) {
+          data.getUnresolvedDances(state.dances).forEach(dance => {
+            warnings.push({
+              type: "Unresolved dance role",
+              message: dance.reviewReason || `${dance.sourceArtistName} / ${dance.roleName}`,
+              dance
+            });
+          });
+        }
+
+        return { issues, warnings };
+      }
+
+      function getCoveredPersonIds() {
+        return new Set(state.dances.map(d => d.personId).filter(Boolean));
+      }
+
+      function renderOverview() {
+        const page = $("#page-overview");
+        const formalGroups = Object.values(groups).filter(g => g.kind !== "subunit");
+        const subunits = Object.values(groups).filter(g => g.kind === "subunit");
+        const review = validateData();
+        const crossGroupPeople = Object.values(people)
+          .filter(person => safeArray(person.groupIds).length > 1)
+          .sort((a, b) => safeArray(b.groupIds).length - safeArray(a.groupIds).length || a.name.localeCompare(b.name));
+
+        const verifiedAt = data.groupReview?.verifiedAt || "Not recorded";
+
+        page.innerHTML = `
+          <div class="metrics">
+            ${metric(formalGroups.length, "Formal groups")}
+            ${metric(subunits.length, "Sub-units")}
+            ${metric(Object.keys(people).length, "People")}
+            ${metric(Object.keys(projects).length, "Projects")}
+            ${metric(achievements.length, "Achievements")}
+            ${metric(state.danceLoadState === "loaded" ? state.dances.length : "—", "Live dances")}
+          </div>
+
+          <div class="grid-2">
+            <div>
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2 class="panel-title">Cross-group identities</h2>
+                    <div class="small muted">People linked to more than one official group/sub-unit.</div>
+                  </div>
+                  <span class="badge">${crossGroupPeople.length}</span>
+                </div>
+                <div class="card-list">
+                  ${crossGroupPeople.slice(0, 18).map(person => `
+                    <button class="row-card js-open-person" type="button" data-person-id="${escapeHtml(person.id)}">
+                      <div class="row-main">
+                        <div>
+                          <div class="row-name">${escapeHtml(person.name)}</div>
+                          <div class="row-meta">${safeArray(person.groupIds).map(groupName).join(" · ")}</div>
+                        </div>
+                        <span class="badge">${safeArray(person.groupIds).length} groups</span>
+                      </div>
+                    </button>
+                  `).join("") || `<div class="empty">No cross-group identities.</div>`}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2 class="panel-title">Data health</h2>
+                    <div class="small muted">Last group verification: ${escapeHtml(verifiedAt)}</div>
+                  </div>
+                </div>
+                ${review.issues.length === 0
+                  ? `<div class="integrity-ok">✓ No broken group/person/project references detected.</div>`
+                  : review.issues.map(item => `<div class="note">${escapeHtml(item.message)}</div>`).join("")}
+
+                <div style="margin-top:14px;" class="small muted">
+                  ${review.warnings.length} item${review.warnings.length === 1 ? "" : "s"} currently deserve review or human context.
+                </div>
+                <button class="button js-go-review" type="button" style="margin-top:10px;">Open Needs Review</button>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">
+                  <h2 class="panel-title">Membership policy</h2>
+                </div>
+                <div class="small" style="line-height:1.7;">
+                  <div>✓ Former officially debuted members count for “all members” achievements.</div>
+                  <div>✓ Sub-units reuse the same Person IDs as parent groups.</div>
+                  <div>✓ Collaborations are projects, not invented groups.</div>
+                  <div>✓ Pre-debut departures currently do not count.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        bindSharedNavigation(page);
+      }
+
+      function filteredGroups() {
+        const query = state.groupSearch.trim().toLowerCase();
+        return Object.values(groups)
+          .filter(group => state.groupStatus === "all" || group.status === state.groupStatus)
+          .filter(group => state.groupKind === "all" || group.kind === state.groupKind)
+          .filter(group => {
+            if (!query) return true;
+            const haystack = [group.id, group.name, group.status, group.kind].join(" ").toLowerCase();
+            return haystack.includes(query);
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+
+      function renderGroupDetail(groupId) {
+        const group = groups[groupId];
+        if (!group) return `<div class="empty">Choose a group.</div>`;
+
+        const currentIds = safeArray(group.currentMemberIds);
+        const formerIds = safeArray(group.formerMemberIds);
+        const totalIds = safeArray(group.memberIds);
+        const subunits = getSubunits(group.id);
+        const parent = group.parentGroupId ? groups[group.parentGroupId] : null;
+
+        const selectedPerson = state.selectedPersonId ? people[state.selectedPersonId] : null;
+
+        return `
+          <div class="detail-title">
+            <h2>${escapeHtml(group.name)}</h2>
+            ${kindBadge(group.kind)}
+            ${statusBadge(group.status)}
+          </div>
+          <div class="id-line">${escapeHtml(group.id)}</div>
+
+          ${parent ? `<div class="small muted" style="margin-top:7px;">Parent group: <strong>${escapeHtml(parent.name)}</strong></div>` : ""}
+
+          <div class="stat-strip">
+            <div class="mini-stat"><strong>${currentIds.length}</strong><span>Current</span></div>
+            <div class="mini-stat"><strong>${formerIds.length}</strong><span>Former</span></div>
+            <div class="mini-stat"><strong>${totalIds.length}</strong><span>Achievement pool</span></div>
+          </div>
+
+          <div class="member-section">
+            <div class="section-label">Current members</div>
+            <div class="member-grid">
+              ${currentIds.map(id => `
+                <button class="member-chip js-member" type="button" data-person-id="${escapeHtml(id)}">
+                  ${escapeHtml(personName(id))}
+                </button>
+              `).join("") || `<span class="small muted">None</span>`}
+            </div>
+          </div>
+
+          <div class="member-section">
+            <div class="section-label">Former members</div>
+            <div class="member-grid">
+              ${formerIds.map(id => `
+                <button class="member-chip former js-member" type="button" data-person-id="${escapeHtml(id)}">
+                  ${escapeHtml(personName(id))}
+                </button>
+              `).join("") || `<span class="small muted">None</span>`}
+            </div>
+          </div>
+
+          ${subunits.length ? `
+            <div class="member-section">
+              <div class="section-label">Sub-units</div>
+              <div class="member-grid">
+                ${subunits.map(sub => `
+                  <button class="member-chip js-open-group" type="button" data-group-id="${escapeHtml(sub.id)}">
+                    ${escapeHtml(sub.name)}
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+          ` : ""}
+
+          ${group.note ? `<div class="note">${escapeHtml(group.note)}</div>` : ""}
+          ${group.reviewNote ? `<div class="note"><strong>Review:</strong> ${escapeHtml(group.reviewNote)}</div>` : ""}
+
+          <div class="person-drawer">
+            ${selectedPerson ? renderInlinePerson(selectedPerson) : `<div class="small muted">Click a member to inspect that Person record and all of their group relationships.</div>`}
+          </div>
+
+          <details style="margin-top:16px;">
+            <summary>Raw group object</summary>
+            <div class="json-box">${escapeHtml(JSON.stringify(group, null, 2))}</div>
+          </details>
+        `;
+      }
+
+      function renderInlinePerson(person) {
+        const current = safeArray(person.currentGroupIds);
+        const former = safeArray(person.formerGroupIds);
+        const all = safeArray(person.groupIds);
+
+        return `
+          <div class="detail-title">
+            <h2 style="font-size:20px;">${escapeHtml(person.name)}</h2>
+            <span class="badge">Person</span>
+          </div>
+          <div class="id-line">${escapeHtml(person.id)}</div>
+
+          ${safeArray(person.aliases).length ? `<div class="small muted" style="margin-top:7px;">Aliases: ${safeArray(person.aliases).map(escapeHtml).join(", ")}</div>` : ""}
+
+          <div class="member-section">
+            <div class="section-label">All group relationships</div>
+            <div class="relation-list">
+              ${all.map(groupId => {
+                const isCurrent = current.includes(groupId);
+                const isFormer = former.includes(groupId);
+                const group = groups[groupId];
+                const relationship = group?.kind === "subunit" ? "sub-unit" : isFormer ? "former" : isCurrent ? "current" : "linked";
+                return `<button type="button" class="relation js-open-group" data-group-id="${escapeHtml(groupId)}">${escapeHtml(groupName(groupId))} · ${escapeHtml(relationship)}</button>`;
+              }).join("") || `<span class="small muted">No group relationship.</span>`}
+            </div>
+          </div>
+
+          <button class="button js-open-person" data-person-id="${escapeHtml(person.id)}" type="button" style="margin-top:12px;">Open in People</button>
+        `;
+      }
+
+      function renderGroups() {
+        const page = $("#page-groups");
+        const statuses = [...new Set(Object.values(groups).map(g => g.status).filter(Boolean))].sort();
+        const list = filteredGroups();
+
+        if (!groups[state.selectedGroupId] && list[0]) state.selectedGroupId = list[0].id;
+
+        page.innerHTML = `
+          <div class="toolbar">
+            <input id="groupSearch" class="input" type="search" placeholder="Search group or ID…" value="${escapeHtml(state.groupSearch)}" />
+            <select id="groupKind" class="select">
+              <option value="all" ${state.groupKind === "all" ? "selected" : ""}>All kinds</option>
+              <option value="group" ${state.groupKind === "group" ? "selected" : ""}>Groups</option>
+              <option value="subunit" ${state.groupKind === "subunit" ? "selected" : ""}>Sub-units</option>
+            </select>
+            <select id="groupStatus" class="select">
+              <option value="all">All statuses</option>
+              ${statuses.map(status => `<option value="${escapeHtml(status)}" ${state.groupStatus === status ? "selected" : ""}>${escapeHtml(status)}</option>`).join("")}
+            </select>
+          </div>
+
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2 class="panel-title">Groups</h2>
+                  <div class="small muted">${list.length} result${list.length === 1 ? "" : "s"}</div>
+                </div>
+              </div>
+              <div class="card-list">
+                ${list.map(group => `
+                  <button class="row-card js-group-row ${group.id === state.selectedGroupId ? "selected" : ""}" type="button" data-group-id="${escapeHtml(group.id)}">
+                    <div class="row-main">
+                      <div>
+                        <div class="row-name">${escapeHtml(group.name)}</div>
+                        <div class="row-meta">${escapeHtml(group.id)} · ${safeArray(group.memberIds).length} historical member${safeArray(group.memberIds).length === 1 ? "" : "s"}</div>
+                      </div>
+                      <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+                        ${kindBadge(group.kind)}
+                        ${statusBadge(group.status)}
+                      </div>
+                    </div>
+                  </button>
+                `).join("") || `<div class="empty">No groups match this filter.</div>`}
+              </div>
+            </div>
+
+            <div class="panel" id="groupDetail">
+              ${renderGroupDetail(state.selectedGroupId)}
+            </div>
+          </div>
+        `;
+
+        $("#groupSearch", page).addEventListener("input", event => {
+          state.groupSearch = event.target.value;
+          renderGroups();
+          $("#groupSearch").focus();
+          $("#groupSearch").setSelectionRange(state.groupSearch.length, state.groupSearch.length);
+        });
+
+        $("#groupKind", page).addEventListener("change", event => {
+          state.groupKind = event.target.value;
+          renderGroups();
+        });
+
+        $("#groupStatus", page).addEventListener("change", event => {
+          state.groupStatus = event.target.value;
+          renderGroups();
+        });
+
+        $$(".js-group-row", page).forEach(button => {
+          button.addEventListener("click", () => {
+            state.selectedGroupId = button.dataset.groupId;
+            state.selectedPersonId = null;
+            renderGroups();
+          });
+        });
+
+        bindGroupDetailActions(page);
+      }
+
+      function bindGroupDetailActions(scope) {
+        $$(".js-member", scope).forEach(button => {
+          button.addEventListener("click", () => {
+            state.selectedPersonId = button.dataset.personId;
+            const detail = $("#groupDetail");
+            if (detail) detail.innerHTML = renderGroupDetail(state.selectedGroupId);
+            bindGroupDetailActions(scope);
+          });
+        });
+
+        $$(".js-open-group", scope).forEach(button => {
+          button.addEventListener("click", () => {
+            state.selectedGroupId = button.dataset.groupId;
+            state.selectedPersonId = null;
+            switchPage("groups");
+          });
+        });
+
+        $$(".js-open-person", scope).forEach(button => {
+          button.addEventListener("click", () => {
+            state.selectedPersonId = button.dataset.personId;
+            switchPage("people");
+          });
+        });
+      }
+
+      function filteredPeople() {
+        const query = state.personSearch.trim().toLowerCase();
+        return Object.values(people)
+          .filter(person => state.personGroup === "all" || safeArray(person.groupIds).includes(state.personGroup))
+          .filter(person => {
+            if (!query) return true;
+            const haystack = [person.id, person.name, ...safeArray(person.aliases), ...safeArray(person.groupIds).map(groupName)]
+              .join(" ")
+              .toLowerCase();
+            return haystack.includes(query);
+          })
+          .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+      }
+
+      function renderPeople() {
+        const page = $("#page-people");
+        const list = filteredPeople();
+        const selected = state.selectedPersonId ? people[state.selectedPersonId] : null;
+
+        page.innerHTML = `
+          <div class="toolbar two">
+            <input id="personSearch" class="input" type="search" placeholder="Search person, alias, ID or group…" value="${escapeHtml(state.personSearch)}" />
+            <select id="personGroup" class="select">
+              <option value="all">All affiliations</option>
+              ${Object.values(groups).sort((a,b) => a.name.localeCompare(b.name)).map(group => `
+                <option value="${escapeHtml(group.id)}" ${state.personGroup === group.id ? "selected" : ""}>${escapeHtml(group.name)}</option>
+              `).join("")}
+            </select>
+          </div>
+
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2 class="panel-title">People</h2>
+                  <div class="small muted">${list.length} result${list.length === 1 ? "" : "s"}</div>
+                </div>
+              </div>
+              <div class="card-list">
+                ${list.map(person => `
+                  <button class="row-card js-person-row ${person.id === state.selectedPersonId ? "selected" : ""}" type="button" data-person-id="${escapeHtml(person.id)}">
+                    <div class="row-main">
+                      <div>
+                        <div class="row-name">${escapeHtml(person.name)}</div>
+                        <div class="row-meta">${escapeHtml(person.id)}${safeArray(person.groupIds).length ? ` · ${safeArray(person.groupIds).map(groupName).join(" · ")}` : " · solo / ungrouped"}</div>
+                      </div>
+                      <span class="badge">${safeArray(person.groupIds).length} links</span>
+                    </div>
+                  </button>
+                `).join("") || `<div class="empty">No people match this filter.</div>`}
+              </div>
+            </div>
+
+            <div class="panel" id="personDetail">
+              ${selected ? renderPersonDetail(selected) : `<div class="empty">Choose a person to inspect their canonical identity.</div>`}
+            </div>
+          </div>
+        `;
+
+        $("#personSearch", page).addEventListener("input", event => {
+          state.personSearch = event.target.value;
+          renderPeople();
+          $("#personSearch").focus();
+          $("#personSearch").setSelectionRange(state.personSearch.length, state.personSearch.length);
+        });
+
+        $("#personGroup", page).addEventListener("change", event => {
+          state.personGroup = event.target.value;
+          renderPeople();
+        });
+
+        $$(".js-person-row", page).forEach(button => {
+          button.addEventListener("click", () => {
+            state.selectedPersonId = button.dataset.personId;
+            renderPeople();
+          });
+        });
+
+        bindPersonDetailActions(page);
+      }
+
+      function renderPersonDetail(person) {
+        const current = safeArray(person.currentGroupIds);
+        const former = safeArray(person.formerGroupIds);
+        const all = safeArray(person.groupIds);
+        const participatedProjects = Object.values(projects).filter(project => safeArray(project.participantIds).includes(person.id));
+
+        return `
+          <div class="detail-title">
+            <h2>${escapeHtml(person.name)}</h2>
+            <span class="badge">Person</span>
+          </div>
+          <div class="id-line">${escapeHtml(person.id)}</div>
+
+          ${safeArray(person.aliases).length ? `
+            <div class="member-section">
+              <div class="section-label">Aliases</div>
+              <div class="relation-list">${safeArray(person.aliases).map(alias => `<span class="relation">${escapeHtml(alias)}</span>`).join("")}</div>
+            </div>
+          ` : ""}
+
+          <div class="member-section">
+            <div class="section-label">Current groups / sub-units</div>
+            <div class="relation-list">
+              ${current.map(id => `<button type="button" class="relation js-open-group" data-group-id="${escapeHtml(id)}">${escapeHtml(groupName(id))}</button>`).join("") || `<span class="small muted">None</span>`}
+            </div>
+          </div>
+
+          <div class="member-section">
+            <div class="section-label">Former groups</div>
+            <div class="relation-list">
+              ${former.map(id => `<button type="button" class="relation js-open-group" data-group-id="${escapeHtml(id)}">${escapeHtml(groupName(id))}</button>`).join("") || `<span class="small muted">None</span>`}
+            </div>
+          </div>
+
+          ${participatedProjects.length ? `
+            <div class="member-section">
+              <div class="section-label">Collaboration projects</div>
+              <div class="relation-list">${participatedProjects.map(project => `<span class="relation">${escapeHtml(project.name)}</span>`).join("")}</div>
+            </div>
+          ` : ""}
+
+          <details style="margin-top:16px;">
+            <summary>Raw person object</summary>
+            <div class="json-box">${escapeHtml(JSON.stringify(person, null, 2))}</div>
+          </details>
+        `;
+      }
+
+      function bindPersonDetailActions(scope) {
+        $$(".js-open-group", scope).forEach(button => {
+          button.addEventListener("click", () => {
+            state.selectedGroupId = button.dataset.groupId;
+            state.selectedPersonId = null;
+            switchPage("groups");
+          });
+        });
+      }
+
+      function renderProjects() {
+        const page = $("#page-projects");
+        const list = Object.values(projects).sort((a,b) => a.name.localeCompare(b.name));
+
+        page.innerHTML = `
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Collaboration projects</h2>
+                <div class="small muted">These are intentionally separate from official groups.</div>
+              </div>
+              <span class="badge">${list.length}</span>
+            </div>
+
+            <div class="grid-3">
+              ${list.map(project => `
+                <div class="project-card">
+                  <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+                    <div>
+                      <h3>${escapeHtml(project.name)}</h3>
+                      <div class="id-line">${escapeHtml(project.id)}</div>
+                    </div>
+                    <span class="badge">${escapeHtml(project.kind || "project")}</span>
+                  </div>
+
+                  <div class="member-section">
+                    <div class="section-label">Participants</div>
+                    <div class="member-grid">
+                      ${safeArray(project.participantIds).map(id => `<button class="member-chip js-open-person" type="button" data-person-id="${escapeHtml(id)}">${escapeHtml(personName(id))}</button>`).join("")}
+                    </div>
+                  </div>
+
+                  ${safeArray(project.sourceAliases).length ? `
+                    <details style="margin-top:12px;">
+                      <summary>Source aliases</summary>
+                      <div class="json-box">${escapeHtml(JSON.stringify(project.sourceAliases, null, 2))}</div>
+                    </details>
+                  ` : ""}
+                </div>
+              `).join("") || `<div class="empty">No collaboration projects defined.</div>`}
+            </div>
+          </div>
+        `;
+
+        $$(".js-open-person", page).forEach(button => {
+          button.addEventListener("click", () => {
+            state.selectedPersonId = button.dataset.personId;
+            switchPage("people");
+          });
+        });
+      }
+
+      function renderAchievements() {
+        const page = $("#page-achievements");
+        let evaluated = achievements;
+
+        if (state.danceLoadState === "loaded" && data.evaluateAllAchievements) {
+          evaluated = data.evaluateAllAchievements(state.dances);
+        }
+
+        page.innerHTML = `
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Achievements</h2>
+                <div class="small muted">${state.danceLoadState === "loaded" ? "Progress is using live dance data." : "Load live dance data to calculate real progress."}</div>
+              </div>
+              <span class="badge">${achievements.length}</span>
+            </div>
+
+            <div class="grid-3">
+              ${evaluated.map(achievement => {
+                const hasProgress = Number.isFinite(achievement.current) && Number.isFinite(achievement.total) && achievement.total > 0;
+                const percent = hasProgress ? Math.max(0, Math.min(100, (achievement.current / achievement.total) * 100)) : 0;
+                return `
+                  <div class="achievement-card">
+                    <div style="display:flex;justify-content:space-between;gap:10px;">
+                      <div>
+                        <h3>${escapeHtml(achievement.icon || "🏆")} ${escapeHtml(achievement.title)}</h3>
+                        <div class="small muted">${escapeHtml(achievement.description || "")}</div>
+                      </div>
+                      ${achievement.unlocked ? `<span class="badge active">Unlocked</span>` : ""}
+                    </div>
+
+                    <div class="id-line" style="margin-top:8px;">${escapeHtml(achievement.id)}</div>
+
+                    ${achievement.groupId ? `<div class="small" style="margin-top:9px;">Group: <strong>${escapeHtml(groupName(achievement.groupId))}</strong></div>` : ""}
+
+                    ${hasProgress ? `
+                      <div class="progress"><span style="width:${percent}%"></span></div>
+                      <div class="small muted">${achievement.current} / ${achievement.total}${Number.isFinite(achievement.actual) && achievement.actual !== achievement.current ? ` · actual ${achievement.actual}` : ""}</div>
+                    ` : `<div class="note">Progress unavailable until live dance data is loaded.</div>`}
+
+                    ${safeArray(achievement.missingPeople).length ? `
+                      <div class="small" style="margin-top:9px;"><strong>Missing:</strong> ${safeArray(achievement.missingPeople).map(escapeHtml).join(", ")}</div>
+                    ` : ""}
+                  </div>
+                `;
+              }).join("") || `<div class="empty">No achievements defined.</div>`}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderReview() {
+        const page = $("#page-review");
+        const { issues, warnings } = validateData();
+        const all = [
+          ...issues.map(item => ({...item, severity: "error"})),
+          ...warnings.map(item => ({...item, severity: "warning"}))
+        ];
+
+        page.innerHTML = `
+          <div class="metrics">
+            ${metric(issues.length, "Broken references")}
+            ${metric(warnings.length, "Review items")}
+            ${metric(state.danceLoadState === "loaded" && data.getUnresolvedDances ? data.getUnresolvedDances(state.dances).length : "—", "Unresolved dances")}
+            ${metric(data.groupReview?.verifiedAt || "—", "Group verified")}
+            ${metric(data.groupReview?.formerMembersCount ? "Yes" : "No", "Former count")}
+            ${metric(data.groupReview?.preDebutMembersCount ? "Yes" : "No", "Pre-debut count")}
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Needs Review</h2>
+                <div class="small muted">Automated checks plus policy notes that still need human context.</div>
+              </div>
+            </div>
+
+            <div class="card-list">
+              ${all.map(item => `
+                <div class="review-card">
+                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+                    <span class="badge ${item.severity === "error" ? "former" : "warning"}">${item.severity === "error" ? "Error" : "Review"}</span>
+                    <strong>${escapeHtml(item.type)}</strong>
+                  </div>
+                  <div class="small" style="line-height:1.55;">${escapeHtml(item.message)}</div>
+                  ${item.dance ? `
+                    <details style="margin-top:10px;">
+                      <summary>Dance record</summary>
+                      <div class="json-box">${escapeHtml(JSON.stringify(item.dance, null, 2))}</div>
+                    </details>
+                  ` : ""}
+                </div>
+              `).join("") || `<div class="integrity-ok">✓ Nothing currently requires review.</div>`}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderCurrentPage() {
+        switch (state.page) {
+          case "groups": renderGroups(); break;
+          case "people": renderPeople(); break;
+          case "projects": renderProjects(); break;
+          case "achievements": renderAchievements(); break;
+          case "review": renderReview(); break;
+          default: renderOverview();
+        }
+      }
+
+      function switchPage(pageName) {
+        state.page = pageName;
+        $$(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.page === pageName));
+        $$(".page").forEach(page => page.classList.toggle("active", page.id === `page-${pageName}`));
+        renderCurrentPage();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function bindSharedNavigation(scope) {
+        $$(".js-open-person", scope).forEach(button => {
+          button.addEventListener("click", () => {
+            state.selectedPersonId = button.dataset.personId;
+            switchPage("people");
+          });
+        });
+
+        $$(".js-go-review", scope).forEach(button => {
+          button.addEventListener("click", () => switchPage("review"));
+        });
+      }
+
+      async function loadLiveDances() {
+        const button = $("#reloadDanceData");
+
+        if (!data.loadDanceData) {
+          state.danceLoadState = "error";
+          state.danceLoadError = "HID_DATA.loadDanceData is unavailable.";
+          setLiveStatus("error", "Dance loader unavailable");
+          return;
+        }
+
+        state.danceLoadState = "loading";
+        state.danceLoadError = "";
+        button.disabled = true;
+        button.textContent = "Loading…";
+        setLiveStatus("loading", "Loading live dance data…");
+
+        try {
+          state.dances = await data.loadDanceData();
+          state.danceLoadState = "loaded";
+          setLiveStatus("ok", `${state.dances.length} live dance records loaded`);
+        } catch (error) {
+          console.error(error);
+          state.dances = [];
+          state.danceLoadState = "error";
+          state.danceLoadError = error?.message || String(error);
+          setLiveStatus("error", "Could not load live dance data");
+        } finally {
+          button.disabled = false;
+          button.textContent = "Reload live dance data";
+          renderCurrentPage();
+        }
+      }
+
+      $$(".tab").forEach(tab => {
+        tab.addEventListener("click", () => switchPage(tab.dataset.page));
+      });
+
+      $("#reloadDanceData").addEventListener("click", loadLiveDances);
+
+      // Static data is immediately usable; live dance data is deliberately opt-in.
+      renderOverview();
+    })();
+  </script>
+</body>
+</html>
