@@ -427,6 +427,123 @@
       line-height: 1.55;
     }
 
+    .review-assistant {
+      border: 1px solid var(--accent);
+      background: linear-gradient(135deg, var(--panel), var(--panel-soft));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .review-question-title {
+      margin: 4px 0 16px;
+      font-size: clamp(22px, 3vw, 34px);
+      letter-spacing: -0.035em;
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr);
+      align-items: stretch;
+      gap: 12px;
+      margin: 14px 0 16px;
+    }
+
+    .compare-card {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 16px;
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .compare-label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 850;
+      font-size: 10px;
+      margin-bottom: 8px;
+    }
+
+    .compare-name {
+      font-size: 22px;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+      letter-spacing: -0.025em;
+    }
+
+    .compare-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      margin-top: 7px;
+      overflow-wrap: anywhere;
+    }
+
+    .compare-equals {
+      display: grid;
+      place-items: center;
+      color: var(--accent-strong);
+      font-size: 27px;
+      font-weight: 900;
+    }
+
+    .review-actions,
+    .review-tools {
+      display: flex;
+      gap: 9px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .review-tools {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .button.yes {
+      background: var(--green-soft);
+      color: var(--green);
+      font-weight: 850;
+    }
+
+    .button.no {
+      background: var(--red-soft);
+      color: var(--red);
+      font-weight: 850;
+    }
+
+    .button.skip {
+      color: var(--muted);
+      font-weight: 750;
+    }
+
+    .review-memory-note {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+      flex: 1 1 280px;
+    }
+
+    .local-resolution {
+      display: inline-flex;
+      border-radius: 999px;
+      background: var(--green-soft);
+      color: var(--green);
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    @media (max-width: 720px) {
+      .compare-grid { grid-template-columns: 1fr; }
+      .compare-equals { min-height: 28px; }
+      .review-actions .button { flex: 1 1 140px; }
+    }
+
     @media (max-width: 1080px) {
       .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .grid-2 { grid-template-columns: 1fr; }
@@ -512,7 +629,9 @@
         groupStatus: "all",
         groupKind: "all",
         personSearch: "",
-        personGroup: "all"
+        personGroup: "all",
+        reviewSessionSkipped: new Set(),
+        reviewDecisions: null
       };
 
       const $ = (selector, scope = document) => scope.querySelector(selector);
@@ -529,6 +648,288 @@
 
       function safeArray(value) {
         return Array.isArray(value) ? value : [];
+      }
+
+      const REVIEW_STORAGE_KEY = "hindex-review-decisions-v1";
+
+      function normalizeReviewText(value) {
+        return String(value || "")
+          .trim()
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replaceAll("’", "'")
+          .replace(/[^a-z0-9]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function loadReviewDecisions() {
+        try {
+          const raw = localStorage.getItem(REVIEW_STORAGE_KEY);
+          const parsed = raw ? JSON.parse(raw) : {};
+          return {
+            mappings: parsed && typeof parsed.mappings === "object" ? parsed.mappings : {},
+            rejections: parsed && typeof parsed.rejections === "object" ? parsed.rejections : {}
+          };
+        } catch {
+          return { mappings: {}, rejections: {} };
+        }
+      }
+
+      function getReviewDecisions() {
+        if (!state.reviewDecisions) state.reviewDecisions = loadReviewDecisions();
+        return state.reviewDecisions;
+      }
+
+      function saveReviewDecisions() {
+        try {
+          localStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(getReviewDecisions()));
+        } catch (error) {
+          console.warn("Could not save review decisions", error);
+        }
+      }
+
+      function makeDanceReviewKey(dance) {
+        const source =
+          dance.groupId ||
+          dance.projectId ||
+          normalizeReviewText(dance.sourceArtistName || "unknown-source");
+        return `${source}|||${normalizeReviewText(dance.roleName || "")}`;
+      }
+
+      function applySavedReviewDecisions(dances) {
+        const decisions = getReviewDecisions();
+
+        safeArray(dances).forEach(dance => {
+          if (!dance || dance.personId) return;
+
+          const key = makeDanceReviewKey(dance);
+          const mapping = decisions.mappings[key];
+
+          if (!mapping?.personId || !people[mapping.personId]) return;
+
+          dance.personId = mapping.personId;
+          dance.needsReview = false;
+          dance.reviewReason = "";
+          dance.reviewDecisionApplied = true;
+          dance.reviewDecisionKey = key;
+        });
+
+        return dances;
+      }
+
+      function levenshteinDistance(a, b) {
+        const left = normalizeReviewText(a);
+        const right = normalizeReviewText(b);
+
+        if (left === right) return 0;
+        if (!left.length) return right.length;
+        if (!right.length) return left.length;
+
+        let previous = Array.from({ length: right.length + 1 }, (_, i) => i);
+
+        for (let i = 1; i <= left.length; i++) {
+          const current = [i];
+
+          for (let j = 1; j <= right.length; j++) {
+            current[j] = Math.min(
+              previous[j] + 1,
+              current[j - 1] + 1,
+              previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1)
+            );
+          }
+
+          previous = current;
+        }
+
+        return previous[right.length];
+      }
+
+      function nameSimilarity(a, b) {
+        const left = normalizeReviewText(a);
+        const right = normalizeReviewText(b);
+
+        if (!left || !right) return 0;
+        if (left === right) return 1;
+
+        if (
+          Math.min(left.length, right.length) >= 4 &&
+          (left.includes(right) || right.includes(left))
+        ) return 0.93;
+
+        const charScore =
+          1 - levenshteinDistance(left, right) / Math.max(left.length, right.length);
+
+        const leftTokens = new Set(left.split(" ").filter(Boolean));
+        const rightTokens = new Set(right.split(" ").filter(Boolean));
+        const overlap = [...leftTokens].filter(token => rightTokens.has(token)).length;
+        const union = new Set([...leftTokens, ...rightTokens]).size;
+        const tokenScore = union ? overlap / union : 0;
+
+        return Math.max(charScore, tokenScore * 0.92);
+      }
+
+      function candidateScore(roleName, person) {
+        return Math.max(
+          0,
+          ...[person?.name, ...safeArray(person?.aliases)]
+            .filter(Boolean)
+            .map(name => nameSimilarity(roleName, name))
+        );
+      }
+
+      function candidatePoolForDance(dance) {
+        if (dance.groupId && groups[dance.groupId]) {
+          return {
+            ids: safeArray(groups[dance.groupId].memberIds),
+            scoped: true,
+            context: groups[dance.groupId].name
+          };
+        }
+
+        if (dance.projectId && projects[dance.projectId]) {
+          return {
+            ids: safeArray(projects[dance.projectId].participantIds),
+            scoped: true,
+            context: projects[dance.projectId].name
+          };
+        }
+
+        return {
+          ids: Object.keys(people),
+          scoped: false,
+          context: dance.sourceArtistName || "Unknown source"
+        };
+      }
+
+      function getSuggestedCandidates(dance) {
+        const decisions = getReviewDecisions();
+        const key = makeDanceReviewKey(dance);
+        const rejected = new Set(safeArray(decisions.rejections[key]));
+        const pool = candidatePoolForDance(dance);
+        const threshold = pool.scoped ? 0.38 : 0.68;
+
+        return pool.ids
+          .filter(id => people[id] && !rejected.has(id))
+          .map(id => ({
+            personId: id,
+            person: people[id],
+            score: candidateScore(dance.roleName, people[id])
+          }))
+          .filter(item => item.score >= threshold)
+          .sort((a, b) => b.score - a.score || a.person.name.localeCompare(b.person.name))
+          .slice(0, 5);
+      }
+
+      function getUnresolvedDanceGroups() {
+        if (state.danceLoadState !== "loaded" || !data.getUnresolvedDances) return [];
+
+        const map = new Map();
+
+        data.getUnresolvedDances(state.dances).forEach(dance => {
+          const key = makeDanceReviewKey(dance);
+
+          if (!map.has(key)) {
+            map.set(key, { key, dance, count: 0 });
+          }
+
+          map.get(key).count += 1;
+        });
+
+        return [...map.values()];
+      }
+
+      function getNextReviewQuestion() {
+        const decisions = getReviewDecisions();
+
+        for (const item of getUnresolvedDanceGroups()) {
+          if (decisions.mappings[item.key]) continue;
+          if (state.reviewSessionSkipped.has(item.key)) continue;
+
+          const candidates = getSuggestedCandidates(item.dance);
+          if (!candidates.length) continue;
+
+          return {
+            ...item,
+            candidate: candidates[0],
+            candidateCount: candidates.length
+          };
+        }
+
+        return null;
+      }
+
+      function confirmReviewMatch(question) {
+        const decisions = getReviewDecisions();
+
+        decisions.mappings[question.key] = {
+          personId: question.candidate.personId,
+          sourceArtistName: question.dance.sourceArtistName || "",
+          roleName: question.dance.roleName || "",
+          confirmedAt: new Date().toISOString()
+        };
+
+        delete decisions.rejections[question.key];
+        state.reviewSessionSkipped.delete(question.key);
+
+        saveReviewDecisions();
+        applySavedReviewDecisions(state.dances);
+      }
+
+      function rejectReviewMatch(question) {
+        const decisions = getReviewDecisions();
+        const rejected = new Set(safeArray(decisions.rejections[question.key]));
+
+        rejected.add(question.candidate.personId);
+        decisions.rejections[question.key] = [...rejected];
+        saveReviewDecisions();
+      }
+
+      function exportReviewDecisions() {
+        const payload = {
+          format: "Hindex review decisions",
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          ...getReviewDecisions()
+        };
+
+        const blob = new Blob(
+          [JSON.stringify(payload, null, 2)],
+          { type: "application/json" }
+        );
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download =
+          `hindex-review-decisions-${new Date().toISOString().slice(0, 10)}.json`;
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      async function clearReviewMemory() {
+        if (!window.confirm(
+          "Clear every saved Yes/No identity decision from this browser? Your GitHub files are not affected."
+        )) return;
+
+        state.reviewDecisions = { mappings: {}, rejections: {} };
+        state.reviewSessionSkipped.clear();
+
+        try {
+          localStorage.removeItem(REVIEW_STORAGE_KEY);
+        } catch {}
+
+        if (state.danceLoadState === "loaded") {
+          await loadLiveDances();
+        } else {
+          renderReview();
+        }
       }
 
       function groupName(id) {
@@ -1208,17 +1609,131 @@
       function renderReview() {
         const page = $("#page-review");
         const { issues, warnings } = validateData();
+
         const all = [
-          ...issues.map(item => ({...item, severity: "error"})),
-          ...warnings.map(item => ({...item, severity: "warning"}))
+          ...issues.map(item => ({ ...item, severity: "error" })),
+          ...warnings.map(item => ({ ...item, severity: "warning" }))
         ];
 
+        const unresolvedGroups = getUnresolvedDanceGroups();
+        const question = getNextReviewQuestion();
+        const decisions = getReviewDecisions();
+        const confirmedCount = Object.keys(decisions.mappings || {}).length;
+        const skippedCount = state.reviewSessionSkipped.size;
+
+        let assistant = "";
+
+        if (state.danceLoadState !== "loaded") {
+          assistant = `
+            <div class="review-assistant">
+              <div class="eyebrow">Review Assistant</div>
+              <h2 class="review-question-title">Load live dance data to start.</h2>
+              <div class="small muted">
+                I’ll compare unresolved role names with your Person database and ask one identity question at a time.
+              </div>
+              <div class="review-actions" style="margin-top:14px;">
+                <button class="button primary js-review-load" type="button">Load live dance data</button>
+              </div>
+            </div>
+          `;
+        } else if (question) {
+          const dance = question.dance;
+          const candidate = question.candidate.person;
+          const affiliations = safeArray(candidate.groupIds).map(groupName);
+
+          assistant = `
+            <div class="review-assistant">
+              <div class="panel-header" style="margin-bottom:4px;">
+                <div>
+                  <div class="eyebrow">Review Assistant</div>
+                  <div class="small muted">
+                    ${unresolvedGroups.length} unresolved identity pattern${unresolvedGroups.length === 1 ? "" : "s"} left
+                    · ${confirmedCount} confirmed locally
+                  </div>
+                </div>
+                <span class="badge warning">Human check</span>
+              </div>
+
+              <h2 class="review-question-title">Are these the same person?</h2>
+
+              <div class="compare-grid">
+                <div class="compare-card">
+                  <div class="compare-label">Live dance role</div>
+                  <div class="compare-name">${escapeHtml(dance.roleName || "Unknown role")}</div>
+                  <div class="compare-meta">
+                    Under: <strong>${escapeHtml(dance.sourceArtistName || "Unknown artist")}</strong>
+                    ${dance.songTitle ? `<br />Dance: ${escapeHtml(dance.songTitle)}` : ""}
+                    <br />${question.count} unresolved record${question.count === 1 ? "" : "s"} use this identity pattern
+                  </div>
+                </div>
+
+                <div class="compare-equals" aria-hidden="true">?</div>
+
+                <div class="compare-card">
+                  <div class="compare-label">Canonical person</div>
+                  <div class="compare-name">${escapeHtml(candidate.name)}</div>
+                  <div class="compare-meta">
+                    Person ID: <strong>${escapeHtml(candidate.id)}</strong>
+                    ${affiliations.length ? `<br />Affiliations: ${affiliations.map(escapeHtml).join(" · ")}` : ""}
+                    ${safeArray(candidate.aliases).length
+                      ? `<br />Aliases: ${safeArray(candidate.aliases).map(escapeHtml).join(", ")}`
+                      : ""}
+                  </div>
+                </div>
+              </div>
+
+              <div class="review-actions">
+                <button class="button yes js-review-yes" type="button">✓ Yes, same person</button>
+                <button class="button no js-review-no" type="button">✕ No, different person</button>
+                <button class="button skip js-review-skip" type="button">Not sure — ask later</button>
+              </div>
+
+              <div class="review-tools">
+                <div class="review-memory-note">
+                  Answers are saved in this browser. “Yes” resolves the matching live records immediately in this Viewer; it does not directly modify GitHub.
+                </div>
+                <button class="button js-review-export" type="button">Export decisions</button>
+                <button class="button js-review-clear" type="button">Clear saved decisions</button>
+              </div>
+            </div>
+          `;
+        } else {
+          assistant = `
+            <div class="review-assistant">
+              <div class="eyebrow">Review Assistant</div>
+              <h2 class="review-question-title">
+                ${unresolvedGroups.length === 0
+                  ? "No unresolved dance identities remain."
+                  : "No more confident identity questions right now."}
+              </h2>
+              <div class="small muted">
+                ${unresolvedGroups.length === 0
+                  ? `${confirmedCount} identity mapping${confirmedCount === 1 ? "" : "s"} confirmed locally.`
+                  : `${unresolvedGroups.length} unresolved pattern${unresolvedGroups.length === 1 ? "" : "s"} still need a manual alias/project rule.${skippedCount ? ` ${skippedCount} question${skippedCount === 1 ? "" : "s"} were skipped this session.` : ""}`}
+              </div>
+
+              <div class="review-tools">
+                ${skippedCount ? `<button class="button js-review-unskip" type="button">Ask skipped questions again</button>` : ""}
+                <button class="button js-review-export" type="button">Export decisions</button>
+                <button class="button js-review-clear" type="button">Clear saved decisions</button>
+              </div>
+            </div>
+          `;
+        }
+
         page.innerHTML = `
+          ${assistant}
+
           <div class="metrics">
             ${metric(issues.length, "Broken references")}
             ${metric(warnings.length, "Review items")}
-            ${metric(state.danceLoadState === "loaded" && data.getUnresolvedDances ? data.getUnresolvedDances(state.dances).length : "—", "Unresolved dances")}
-            ${metric(data.groupReview?.verifiedAt || "—", "Group verified")}
+            ${metric(
+              state.danceLoadState === "loaded" && data.getUnresolvedDances
+                ? data.getUnresolvedDances(state.dances).length
+                : "—",
+              "Unresolved dances"
+            )}
+            ${metric(confirmedCount, "Confirmed locally")}
             ${metric(data.groupReview?.formerMembersCount ? "Yes" : "No", "Former count")}
             ${metric(data.groupReview?.preDebutMembersCount ? "Yes" : "No", "Pre-debut count")}
           </div>
@@ -1226,8 +1741,10 @@
           <div class="panel">
             <div class="panel-header">
               <div>
-                <h2 class="panel-title">Needs Review</h2>
-                <div class="small muted">Automated checks plus policy notes that still need human context.</div>
+                <h2 class="panel-title">All Review Items</h2>
+                <div class="small muted">
+                  Raw automated checks and policy notes. Use Review Assistant above for identity matching.
+                </div>
               </div>
             </div>
 
@@ -1235,10 +1752,16 @@
               ${all.map(item => `
                 <div class="review-card">
                   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
-                    <span class="badge ${item.severity === "error" ? "former" : "warning"}">${item.severity === "error" ? "Error" : "Review"}</span>
+                    <span class="badge ${item.severity === "error" ? "former" : "warning"}">
+                      ${item.severity === "error" ? "Error" : "Review"}
+                    </span>
                     <strong>${escapeHtml(item.type)}</strong>
                   </div>
-                  <div class="small" style="line-height:1.55;">${escapeHtml(item.message)}</div>
+
+                  <div class="small" style="line-height:1.55;">
+                    ${escapeHtml(item.message)}
+                  </div>
+
                   ${item.dance ? `
                     <details style="margin-top:10px;">
                       <summary>Dance record</summary>
@@ -1250,6 +1773,36 @@
             </div>
           </div>
         `;
+
+        $(".js-review-yes", page)?.addEventListener("click", () => {
+          confirmReviewMatch(question);
+          renderReview();
+        });
+
+        $(".js-review-no", page)?.addEventListener("click", () => {
+          rejectReviewMatch(question);
+          renderReview();
+        });
+
+        $(".js-review-skip", page)?.addEventListener("click", () => {
+          state.reviewSessionSkipped.add(question.key);
+          renderReview();
+        });
+
+        $(".js-review-unskip", page)?.addEventListener("click", () => {
+          state.reviewSessionSkipped.clear();
+          renderReview();
+        });
+
+        $(".js-review-load", page)?.addEventListener("click", loadLiveDances);
+
+        $$(".js-review-export", page).forEach(button => {
+          button.addEventListener("click", exportReviewDecisions);
+        });
+
+        $$(".js-review-clear", page).forEach(button => {
+          button.addEventListener("click", clearReviewMemory);
+        });
       }
 
       function renderCurrentPage() {
@@ -1302,8 +1855,17 @@
 
         try {
           state.dances = await data.loadDanceData();
+          applySavedReviewDecisions(state.dances);
           state.danceLoadState = "loaded";
-          setLiveStatus("ok", `${state.dances.length} live dance records loaded`);
+
+          const locallyResolved = state.dances.filter(
+            dance => dance.reviewDecisionApplied
+          ).length;
+
+          setLiveStatus(
+            "ok",
+            `${state.dances.length} live dance records loaded${locallyResolved ? ` · ${locallyResolved} resolved from review memory` : ""}`
+          );
         } catch (error) {
           console.error(error);
           state.dances = [];
@@ -1322,6 +1884,8 @@
       });
 
       $("#reloadDanceData").addEventListener("click", loadLiveDances);
+
+      getReviewDecisions();
 
       // Static data is immediately usable; live dance data is deliberately opt-in.
       renderOverview();
