@@ -528,6 +528,131 @@
       flex: 1 1 280px;
     }
 
+    .manual-resolver {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .manual-context {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    .manual-context-card {
+      border: 1px solid var(--border);
+      background: var(--panel-soft);
+      border-radius: 14px;
+      padding: 12px;
+      min-width: 0;
+    }
+
+    .manual-context-value {
+      font-weight: 850;
+      font-size: 16px;
+      overflow-wrap: anywhere;
+      margin-top: 3px;
+    }
+
+    .manual-section {
+      border-top: 1px solid var(--border);
+      margin-top: 16px;
+      padding-top: 16px;
+    }
+
+    .manual-section:first-of-type {
+      border-top: 0;
+      margin-top: 0;
+      padding-top: 0;
+    }
+
+    .manual-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .manual-grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .manual-field {
+      min-width: 0;
+    }
+
+    .manual-field label {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: 6px;
+    }
+
+    .manual-person-select {
+      width: 100%;
+      min-height: 190px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      color: var(--text);
+      padding: 6px;
+      outline: none;
+    }
+
+    .manual-person-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .manual-hint {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.55;
+      margin-top: 7px;
+    }
+
+    .manual-status {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 9px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .manual-warning {
+      border: 1px solid var(--warning-border, var(--border));
+      background: var(--warning-soft, var(--panel-soft));
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 720px) {
+      .manual-context,
+      .manual-grid,
+      .manual-grid.three {
+        grid-template-columns: 1fr;
+      }
+
+      .manual-person-select {
+        min-height: 150px;
+      }
+    }
+
     .local-resolution {
       display: inline-flex;
       border-radius: 999px;
@@ -631,6 +756,7 @@
         personSearch: "",
         personGroup: "all",
         reviewSessionSkipped: new Set(),
+        manualSessionSkipped: new Set(),
         reviewDecisions: null
       };
 
@@ -670,10 +796,11 @@
           const parsed = raw ? JSON.parse(raw) : {};
           return {
             mappings: parsed && typeof parsed.mappings === "object" ? parsed.mappings : {},
-            rejections: parsed && typeof parsed.rejections === "object" ? parsed.rejections : {}
+            rejections: parsed && typeof parsed.rejections === "object" ? parsed.rejections : {},
+            proposals: Array.isArray(parsed?.proposals) ? parsed.proposals : []
           };
         } catch {
-          return { mappings: {}, rejections: {} };
+          return { mappings: {}, rejections: {}, proposals: [] };
         }
       }
 
@@ -691,11 +818,118 @@
       }
 
       function makeDanceReviewKey(dance) {
-        const source =
-          dance.groupId ||
-          dance.projectId ||
-          normalizeReviewText(dance.sourceArtistName || "unknown-source");
-        return `${source}|||${normalizeReviewText(dance.roleName || "")}`;
+        const source = normalizeReviewText(
+          dance?.sourceArtistName ||
+          dance?.raw?.artist ||
+          "unknown-source"
+        );
+
+        const role = normalizeReviewText(
+          dance?.roleName ||
+          dance?.raw?.dancerRole ||
+          ""
+        );
+
+        return `${source}|||${role}`;
+      }
+
+      function slugifyId(value) {
+        return normalizeReviewText(value)
+          .replace(/\s+/g, "_")
+          .replace(/^_+|_+$/g, "");
+      }
+
+      function ensureUniqueId(baseId, collection) {
+        let id = baseId || "new_item";
+        let counter = 2;
+
+        while (collection[id]) {
+          id = `${baseId}_${counter}`;
+          counter += 1;
+        }
+
+        return id;
+      }
+
+      function addUnique(array, value) {
+        if (!Array.isArray(array)) return;
+        if (!array.includes(value)) array.push(value);
+      }
+
+      function applyLocalEntityProposals() {
+        const decisions = getReviewDecisions();
+
+        safeArray(decisions.proposals).forEach(proposal => {
+          if (!proposal || !proposal.personId || !proposal.personName) return;
+
+          if (!people[proposal.personId]) {
+            people[proposal.personId] = {
+              id: proposal.personId,
+              name: proposal.personName,
+              aliases: [],
+              groupIds: [],
+              currentGroupIds: [],
+              formerGroupIds: []
+            };
+          }
+
+          const person = people[proposal.personId];
+
+          if (proposal.sourceType === "group" || proposal.sourceType === "subunit") {
+            if (!proposal.sourceId || !proposal.sourceName) return;
+
+            if (!groups[proposal.sourceId]) {
+              groups[proposal.sourceId] = {
+                id: proposal.sourceId,
+                name: proposal.sourceName,
+                kind: proposal.sourceType === "subunit" ? "subunit" : "group",
+                status: "active",
+                membershipComplete: false,
+                currentMemberIds: [],
+                formerMemberIds: [],
+                memberIds: []
+              };
+            }
+
+            const group = groups[proposal.sourceId];
+
+            if (proposal.sourceType === "subunit" && proposal.parentGroupId) {
+              group.parentGroupId = proposal.parentGroupId;
+            }
+
+            addUnique(group.memberIds, proposal.personId);
+            addUnique(person.groupIds, proposal.sourceId);
+
+            if (proposal.membershipStatus === "former") {
+              addUnique(group.formerMemberIds, proposal.personId);
+              addUnique(person.formerGroupIds, proposal.sourceId);
+            } else {
+              addUnique(group.currentMemberIds, proposal.personId);
+              addUnique(person.currentGroupIds, proposal.sourceId);
+            }
+
+            if (data.groupAliases) {
+              data.groupAliases[normalizeReviewText(proposal.sourceName)] = proposal.sourceId;
+            }
+          }
+
+          if (proposal.sourceType === "project") {
+            if (!proposal.sourceId || !proposal.sourceName) return;
+
+            if (!projects[proposal.sourceId]) {
+              projects[proposal.sourceId] = {
+                id: proposal.sourceId,
+                name: proposal.sourceName,
+                kind: "collaboration",
+                participantIds: [],
+                sourceAliases: [proposal.sourceName]
+              };
+            }
+
+            addUnique(projects[proposal.sourceId].participantIds, proposal.personId);
+            addUnique(projects[proposal.sourceId].sourceAliases, proposal.sourceName);
+          }
+        });
       }
 
       function applySavedReviewDecisions(dances) {
@@ -706,6 +940,15 @@
 
           const key = makeDanceReviewKey(dance);
           const mapping = decisions.mappings[key];
+
+          if (mapping?.ignore === true) {
+            dance.needsReview = false;
+            dance.reviewReason = "";
+            dance.reviewDecisionApplied = true;
+            dance.reviewDecisionKey = key;
+            dance.reviewIgnored = true;
+            return;
+          }
 
           if (!mapping?.personId || !people[mapping.personId]) return;
 
@@ -797,7 +1040,7 @@
         }
 
         return {
-          ids: Object.keys(people),
+          ids: [],
           scoped: false,
           context: dance.sourceArtistName || "Unknown source"
         };
@@ -808,7 +1051,12 @@
         const key = makeDanceReviewKey(dance);
         const rejected = new Set(safeArray(decisions.rejections[key]));
         const pool = candidatePoolForDance(dance);
-        const threshold = pool.scoped ? 0.38 : 0.68;
+
+        // Never auto-guess across the entire database when the source artist/group
+        // itself is unknown. Manual Resolver handles those cases instead.
+        if (!pool.scoped) return [];
+
+        const threshold = 0.38;
 
         return pool.ids
           .filter(id => people[id] && !rejected.has(id))
@@ -860,6 +1108,155 @@
         return null;
       }
 
+      function getNextManualReviewItem() {
+        const decisions = getReviewDecisions();
+
+        for (const item of getUnresolvedDanceGroups()) {
+          if (decisions.mappings[item.key]) continue;
+          if (state.manualSessionSkipped.has(item.key)) continue;
+
+          return item;
+        }
+
+        return null;
+      }
+
+      function manualCandidateIdsForDance(dance) {
+        if (dance.groupId && groups[dance.groupId]) {
+          return safeArray(groups[dance.groupId].memberIds);
+        }
+
+        if (dance.projectId && projects[dance.projectId]) {
+          return safeArray(projects[dance.projectId].participantIds);
+        }
+
+        // Manual selection is deliberate, so global browsing is allowed here.
+        return Object.keys(people);
+      }
+
+      function renderPersonOption(personId) {
+        const person = people[personId];
+        if (!person) return "";
+
+        const affiliations = safeArray(person.groupIds)
+          .map(groupName)
+          .filter(Boolean)
+          .join(" · ");
+
+        return `${person.name} — ${person.id}${affiliations ? ` — ${affiliations}` : ""}`;
+      }
+
+      function saveManualExistingMapping(item, personId) {
+        if (!item || !personId || !people[personId]) return false;
+
+        const decisions = getReviewDecisions();
+
+        decisions.mappings[item.key] = {
+          personId,
+          sourceArtistName: item.dance.sourceArtistName || "",
+          roleName: item.dance.roleName || "",
+          resolutionType: "manual_existing_person",
+          confirmedAt: new Date().toISOString()
+        };
+
+        delete decisions.rejections[item.key];
+        state.manualSessionSkipped.delete(item.key);
+
+        saveReviewDecisions();
+        applySavedReviewDecisions(state.dances);
+        return true;
+      }
+
+      function saveIgnoreMapping(item) {
+        if (!item) return;
+
+        const decisions = getReviewDecisions();
+
+        decisions.mappings[item.key] = {
+          ignore: true,
+          sourceArtistName: item.dance.sourceArtistName || "",
+          roleName: item.dance.roleName || "",
+          resolutionType: "ignore_non_person_role",
+          confirmedAt: new Date().toISOString()
+        };
+
+        state.manualSessionSkipped.delete(item.key);
+        saveReviewDecisions();
+        applySavedReviewDecisions(state.dances);
+      }
+
+      function saveNewEntityProposal(item, form) {
+        const decisions = getReviewDecisions();
+
+        const sourceType = form.sourceType;
+        const sourceName = String(form.sourceName || "").trim();
+        const requestedSourceId = slugifyId(form.sourceId || sourceName);
+        const personName = String(form.personName || "").trim();
+        const requestedPersonId = slugifyId(form.personId || personName);
+        const membershipStatus = form.membershipStatus === "former" ? "former" : "current";
+        const parentGroupId = String(form.parentGroupId || "").trim();
+
+        if (!personName || !requestedPersonId) {
+          throw new Error("Canonical person name and Person ID are required.");
+        }
+
+        let personId = requestedPersonId;
+
+        if (people[personId] && people[personId].name !== personName) {
+          personId = ensureUniqueId(personId, people);
+        }
+
+        let sourceId = requestedSourceId;
+
+        if (sourceType !== "solo") {
+          if (!sourceName || !sourceId) {
+            throw new Error("Source name and Source ID are required.");
+          }
+
+          const sourceCollection = sourceType === "project" ? projects : groups;
+
+          if (sourceCollection[sourceId] && sourceCollection[sourceId].name !== sourceName) {
+            sourceId = ensureUniqueId(sourceId, sourceCollection);
+          }
+        } else {
+          sourceId = "";
+        }
+
+        const proposal = {
+          id: `proposal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          reviewKey: item.key,
+          sourceType,
+          sourceName,
+          sourceId,
+          parentGroupId: sourceType === "subunit" ? parentGroupId : "",
+          membershipStatus,
+          personName,
+          personId,
+          rawSourceArtistName: item.dance.sourceArtistName || "",
+          rawRoleName: item.dance.roleName || "",
+          createdAt: new Date().toISOString()
+        };
+
+        decisions.proposals.push(proposal);
+
+        decisions.mappings[item.key] = {
+          personId,
+          sourceArtistName: item.dance.sourceArtistName || "",
+          roleName: item.dance.roleName || "",
+          resolutionType: "new_entity_proposal",
+          proposalId: proposal.id,
+          confirmedAt: new Date().toISOString()
+        };
+
+        state.manualSessionSkipped.delete(item.key);
+
+        applyLocalEntityProposals();
+        saveReviewDecisions();
+        applySavedReviewDecisions(state.dances);
+
+        return proposal;
+      }
+
       function confirmReviewMatch(question) {
         const decisions = getReviewDecisions();
 
@@ -889,7 +1286,7 @@
       function exportReviewDecisions() {
         const payload = {
           format: "Hindex review decisions",
-          version: 1,
+          version: 2,
           exportedAt: new Date().toISOString(),
           ...getReviewDecisions()
         };
@@ -915,21 +1312,14 @@
 
       async function clearReviewMemory() {
         if (!window.confirm(
-          "Clear every saved Yes/No identity decision from this browser? Your GitHub files are not affected."
+          "Clear every saved review decision and local proposal from this browser? Your GitHub files are not affected."
         )) return;
-
-        state.reviewDecisions = { mappings: {}, rejections: {} };
-        state.reviewSessionSkipped.clear();
 
         try {
           localStorage.removeItem(REVIEW_STORAGE_KEY);
         } catch {}
 
-        if (state.danceLoadState === "loaded") {
-          await loadLiveDances();
-        } else {
-          renderReview();
-        }
+        window.location.reload();
       }
 
       function groupName(id) {
@@ -1617,9 +2007,10 @@
 
         const unresolvedGroups = getUnresolvedDanceGroups();
         const question = getNextReviewQuestion();
+        const manualItem = question ? null : getNextManualReviewItem();
         const decisions = getReviewDecisions();
         const confirmedCount = Object.keys(decisions.mappings || {}).length;
-        const skippedCount = state.reviewSessionSkipped.size;
+        const proposalCount = safeArray(decisions.proposals).length;
 
         let assistant = "";
 
@@ -1629,7 +2020,7 @@
               <div class="eyebrow">Review Assistant</div>
               <h2 class="review-question-title">Load live dance data to start.</h2>
               <div class="small muted">
-                I’ll compare unresolved role names with your Person database and ask one identity question at a time.
+                Known groups/projects use safe identity matching. Unknown sources are sent to Manual Resolver instead of being guessed across the whole database.
               </div>
               <div class="review-actions" style="margin-top:14px;">
                 <button class="button primary js-review-load" type="button">Load live dance data</button>
@@ -1645,13 +2036,13 @@
             <div class="review-assistant">
               <div class="panel-header" style="margin-bottom:4px;">
                 <div>
-                  <div class="eyebrow">Review Assistant</div>
+                  <div class="eyebrow">Auto Review</div>
                   <div class="small muted">
                     ${unresolvedGroups.length} unresolved identity pattern${unresolvedGroups.length === 1 ? "" : "s"} left
-                    · ${confirmedCount} confirmed locally
+                    · ${confirmedCount} resolved locally
                   </div>
                 </div>
-                <span class="badge warning">Human check</span>
+                <span class="badge warning">Known source</span>
               </div>
 
               <h2 class="review-question-title">Are these the same person?</h2>
@@ -1663,7 +2054,7 @@
                   <div class="compare-meta">
                     Under: <strong>${escapeHtml(dance.sourceArtistName || "Unknown artist")}</strong>
                     ${dance.songTitle ? `<br />Dance: ${escapeHtml(dance.songTitle)}` : ""}
-                    <br />${question.count} unresolved record${question.count === 1 ? "" : "s"} use this identity pattern
+                    <br />${question.count} unresolved record${question.count === 1 ? "" : "s"} use this pattern
                   </div>
                 </div>
 
@@ -1690,7 +2081,195 @@
 
               <div class="review-tools">
                 <div class="review-memory-note">
-                  Answers are saved in this browser. “Yes” resolves the matching live records immediately in this Viewer; it does not directly modify GitHub.
+                  Auto Review only compares people inside an already-known group/project. Unknown artists no longer trigger cross-database fuzzy guesses.
+                </div>
+                <button class="button js-review-export" type="button">Export decisions</button>
+                <button class="button js-review-clear" type="button">Clear saved decisions</button>
+              </div>
+            </div>
+          `;
+        } else if (manualItem) {
+          const dance = manualItem.dance;
+          const knownGroup = dance.groupId && groups[dance.groupId] ? groups[dance.groupId] : null;
+          const knownProject = dance.projectId && projects[dance.projectId] ? projects[dance.projectId] : null;
+
+          const sourceStatus = knownGroup
+            ? `Known ${knownGroup.kind}: ${knownGroup.name}`
+            : knownProject
+              ? `Known project: ${knownProject.name}`
+              : "Unknown source / not yet registered";
+
+          const manualIds = manualCandidateIdsForDance(dance)
+            .filter(id => people[id])
+            .sort((a, b) => people[a].name.localeCompare(people[b].name));
+
+          const sourceTypeDefault = knownGroup
+            ? knownGroup.kind === "subunit" ? "subunit" : "group"
+            : knownProject
+              ? "project"
+              : "group";
+
+          const sourceNameDefault = knownGroup?.name || knownProject?.name || dance.sourceArtistName || "";
+          const sourceIdDefault = knownGroup?.id || knownProject?.id || slugifyId(sourceNameDefault);
+          const personNameDefault = dance.roleName || "";
+          const personIdDefault = slugifyId(personNameDefault);
+
+          assistant = `
+            <div class="manual-resolver">
+              <div class="panel-header">
+                <div>
+                  <div class="eyebrow">Manual Resolver</div>
+                  <h2 class="panel-title" style="font-size:26px;margin-top:4px;">Resolve this identity with context</h2>
+                  <div class="small muted">
+                    ${unresolvedGroups.length} unresolved pattern${unresolvedGroups.length === 1 ? "" : "s"} remain.
+                    Nothing here is automatically written to GitHub.
+                  </div>
+                </div>
+                <span class="manual-status">${escapeHtml(sourceStatus)}</span>
+              </div>
+
+              <div class="manual-context">
+                <div class="manual-context-card">
+                  <div class="compare-label">Artist / source</div>
+                  <div class="manual-context-value">${escapeHtml(dance.sourceArtistName || "Unknown")}</div>
+                </div>
+                <div class="manual-context-card">
+                  <div class="compare-label">Dance role</div>
+                  <div class="manual-context-value">${escapeHtml(dance.roleName || "Unknown")}</div>
+                </div>
+                <div class="manual-context-card">
+                  <div class="compare-label">Example dance</div>
+                  <div class="manual-context-value">${escapeHtml(dance.songTitle || "Untitled")}</div>
+                  <div class="manual-hint">${manualItem.count} unresolved record${manualItem.count === 1 ? "" : "s"} share this exact source + role.</div>
+                </div>
+              </div>
+
+              <div class="manual-section">
+                <strong>Option A — Map it to a Person already in the database</strong>
+                <div class="manual-hint">
+                  ${knownGroup
+                    ? `Only members of ${escapeHtml(knownGroup.name)} are shown.`
+                    : knownProject
+                      ? `Only participants of ${escapeHtml(knownProject.name)} are shown.`
+                      : `The source is unknown, so you may manually search all People. No automatic guess is made.`}
+                </div>
+
+                <div class="manual-grid">
+                  <div class="manual-field">
+                    <label for="manualPersonSearch">Search existing people</label>
+                    <input id="manualPersonSearch" class="input" type="search" placeholder="Name, Person ID, group…" />
+                  </div>
+                  <div class="manual-field">
+                    <label>Selected resolution</label>
+                    <div id="manualSelectedPerson" class="input" style="display:flex;align-items:center;color:var(--muted);">
+                      No person selected
+                    </div>
+                  </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                  <select id="manualPersonSelect" class="manual-person-select" size="7" aria-label="Existing people">
+                    ${manualIds.map(id =>
+                      `<option value="${escapeHtml(id)}">${escapeHtml(renderPersonOption(id))}</option>`
+                    ).join("")}
+                  </select>
+                </div>
+
+                <div class="review-actions" style="margin-top:10px;">
+                  <button id="manualResolveExisting" class="button primary" type="button" disabled>
+                    Resolve to selected Person
+                  </button>
+                </div>
+              </div>
+
+              <div class="manual-section">
+                <strong>Option B — This Person / source is missing from the database</strong>
+                <div class="manual-hint">
+                  Save a local database proposal. It will be included in <strong>Export decisions</strong> so we can later write it properly into groups.js / artists.js / dances.js.
+                </div>
+
+                <div class="manual-grid three">
+                  <div class="manual-field">
+                    <label for="manualSourceType">Source type</label>
+                    <select id="manualSourceType" class="select">
+                      <option value="group" ${sourceTypeDefault === "group" ? "selected" : ""}>Formal group</option>
+                      <option value="subunit" ${sourceTypeDefault === "subunit" ? "selected" : ""}>Sub-unit</option>
+                      <option value="project" ${sourceTypeDefault === "project" ? "selected" : ""}>Collaboration / project</option>
+                      <option value="solo" ${sourceTypeDefault === "solo" ? "selected" : ""}>Solo artist</option>
+                    </select>
+                  </div>
+
+                  <div class="manual-field source-field">
+                    <label for="manualSourceName">Canonical source name</label>
+                    <input id="manualSourceName" class="input" value="${escapeHtml(sourceNameDefault)}" />
+                  </div>
+
+                  <div class="manual-field source-field">
+                    <label for="manualSourceId">Source ID</label>
+                    <input id="manualSourceId" class="input" value="${escapeHtml(sourceIdDefault)}" />
+                  </div>
+                </div>
+
+                <div class="manual-grid three">
+                  <div class="manual-field">
+                    <label for="manualPersonName">Canonical person name</label>
+                    <input id="manualPersonName" class="input" value="${escapeHtml(personNameDefault)}" />
+                  </div>
+
+                  <div class="manual-field">
+                    <label for="manualPersonId">Person ID</label>
+                    <input id="manualPersonId" class="input" value="${escapeHtml(personIdDefault)}" />
+                  </div>
+
+                  <div class="manual-field membership-field">
+                    <label for="manualMembershipStatus">Membership</label>
+                    <select id="manualMembershipStatus" class="select">
+                      <option value="current">Current member</option>
+                      <option value="former">Former member</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="manualParentWrap" class="manual-grid" style="display:none;">
+                  <div class="manual-field">
+                    <label for="manualParentGroup">Parent group for sub-unit</label>
+                    <select id="manualParentGroup" class="select">
+                      <option value="">Choose parent group…</option>
+                      ${Object.values(groups)
+                        .filter(group => group.kind === "group")
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map(group => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`)
+                        .join("")}
+                    </select>
+                  </div>
+                </div>
+
+                <div class="manual-warning">
+                  If the live value is simply a typo (for example <strong>julia → Juria</strong>), do not create a proposal. Fix the original Google Sheet instead, then use “Reload after fixing source data” below.
+                </div>
+
+                <div class="review-actions" style="margin-top:10px;">
+                  <button id="manualCreateProposal" class="button primary" type="button">
+                    Save local database proposal
+                  </button>
+                </div>
+              </div>
+
+              <div class="manual-section">
+                <strong>Other actions</strong>
+                <div class="review-actions" style="margin-top:10px;">
+                  <button id="manualReloadSource" class="button" type="button">↻ Reload after fixing source data</button>
+                  <button id="manualSkipPattern" class="button skip" type="button">Ask me later</button>
+                  <button id="manualIgnorePattern" class="button" type="button">Ignore this role for achievements</button>
+                </div>
+                <div class="manual-hint">
+                  “Ignore” is only for a role that is genuinely not a Person you want to count. It should not be used to hide an unresolved real member.
+                </div>
+              </div>
+
+              <div class="review-tools">
+                <div class="review-memory-note">
+                  ${confirmedCount} resolved locally · ${proposalCount} new database proposal${proposalCount === 1 ? "" : "s"} saved.
                 </div>
                 <button class="button js-review-export" type="button">Export decisions</button>
                 <button class="button js-review-clear" type="button">Clear saved decisions</button>
@@ -1704,16 +2283,17 @@
               <h2 class="review-question-title">
                 ${unresolvedGroups.length === 0
                   ? "No unresolved dance identities remain."
-                  : "No more confident identity questions right now."}
+                  : "Everything remaining was skipped for this session."}
               </h2>
               <div class="small muted">
                 ${unresolvedGroups.length === 0
-                  ? `${confirmedCount} identity mapping${confirmedCount === 1 ? "" : "s"} confirmed locally.`
-                  : `${unresolvedGroups.length} unresolved pattern${unresolvedGroups.length === 1 ? "" : "s"} still need a manual alias/project rule.${skippedCount ? ` ${skippedCount} question${skippedCount === 1 ? "" : "s"} were skipped this session.` : ""}`}
+                  ? `${confirmedCount} pattern${confirmedCount === 1 ? "" : "s"} resolved locally.`
+                  : `${unresolvedGroups.length} unresolved pattern${unresolvedGroups.length === 1 ? "" : "s"} still remain.`}
               </div>
-
               <div class="review-tools">
-                ${skippedCount ? `<button class="button js-review-unskip" type="button">Ask skipped questions again</button>` : ""}
+                ${state.reviewSessionSkipped.size || state.manualSessionSkipped.size
+                  ? `<button class="button js-review-unskip" type="button">Ask skipped questions again</button>`
+                  : ""}
                 <button class="button js-review-export" type="button">Export decisions</button>
                 <button class="button js-review-clear" type="button">Clear saved decisions</button>
               </div>
@@ -1733,9 +2313,9 @@
                 : "—",
               "Unresolved dances"
             )}
-            ${metric(confirmedCount, "Confirmed locally")}
+            ${metric(confirmedCount, "Resolved locally")}
+            ${metric(proposalCount, "New proposals")}
             ${metric(data.groupReview?.formerMembersCount ? "Yes" : "No", "Former count")}
-            ${metric(data.groupReview?.preDebutMembersCount ? "Yes" : "No", "Pre-debut count")}
           </div>
 
           <div class="panel">
@@ -1743,7 +2323,7 @@
               <div>
                 <h2 class="panel-title">All Review Items</h2>
                 <div class="small muted">
-                  Raw automated checks and policy notes. Use Review Assistant above for identity matching.
+                  Group notes and duplicate display names are informational. Focus on unresolved dance identities above.
                 </div>
               </div>
             </div>
@@ -1774,6 +2354,7 @@
           </div>
         `;
 
+        // -------- Auto Review events --------
         $(".js-review-yes", page)?.addEventListener("click", () => {
           confirmReviewMatch(question);
           renderReview();
@@ -1785,16 +2366,159 @@
         });
 
         $(".js-review-skip", page)?.addEventListener("click", () => {
-          state.reviewSessionSkipped.add(question.key);
-          renderReview();
-        });
-
-        $(".js-review-unskip", page)?.addEventListener("click", () => {
-          state.reviewSessionSkipped.clear();
+          if (question) state.reviewSessionSkipped.add(question.key);
           renderReview();
         });
 
         $(".js-review-load", page)?.addEventListener("click", loadLiveDances);
+
+        // -------- Manual Resolver events --------
+        if (manualItem) {
+          const personSearch = $("#manualPersonSearch", page);
+          const personSelect = $("#manualPersonSelect", page);
+          const selectedLabel = $("#manualSelectedPerson", page);
+          const resolveButton = $("#manualResolveExisting", page);
+          const sourceType = $("#manualSourceType", page);
+          const sourceName = $("#manualSourceName", page);
+          const sourceId = $("#manualSourceId", page);
+          const personNameInput = $("#manualPersonName", page);
+          const personIdInput = $("#manualPersonId", page);
+          const membershipStatus = $("#manualMembershipStatus", page);
+          const parentWrap = $("#manualParentWrap", page);
+          const parentGroup = $("#manualParentGroup", page);
+
+          const allManualIds = manualCandidateIdsForDance(manualItem.dance)
+            .filter(id => people[id])
+            .sort((a, b) => people[a].name.localeCompare(people[b].name));
+
+          function refreshManualPeople() {
+            const query = normalizeReviewText(personSearch?.value || "");
+            const ids = allManualIds.filter(id => {
+              const person = people[id];
+              const haystack = normalizeReviewText(
+                [
+                  person.name,
+                  person.id,
+                  ...safeArray(person.aliases),
+                  ...safeArray(person.groupIds).map(groupName)
+                ].join(" ")
+              );
+              return !query || haystack.includes(query);
+            });
+
+            personSelect.innerHTML = ids
+              .map(id => `<option value="${escapeHtml(id)}">${escapeHtml(renderPersonOption(id))}</option>`)
+              .join("");
+
+            resolveButton.disabled = true;
+            selectedLabel.textContent = "No person selected";
+            selectedLabel.style.color = "var(--muted)";
+          }
+
+          function syncSourceTypeUi() {
+            const type = sourceType.value;
+            const solo = type === "solo";
+            const subunit = type === "subunit";
+
+            $$(".source-field", page).forEach(field => {
+              field.style.display = solo ? "none" : "";
+            });
+
+            $(".membership-field", page).style.display =
+              type === "project" || type === "solo" ? "none" : "";
+
+            parentWrap.style.display = subunit ? "grid" : "none";
+          }
+
+          personSearch?.addEventListener("input", refreshManualPeople);
+
+          personSelect?.addEventListener("change", () => {
+            const id = personSelect.value;
+            const person = people[id];
+
+            if (!person) {
+              resolveButton.disabled = true;
+              selectedLabel.textContent = "No person selected";
+              return;
+            }
+
+            selectedLabel.textContent = `${person.name} (${person.id})`;
+            selectedLabel.style.color = "var(--text)";
+            resolveButton.disabled = false;
+          });
+
+          resolveButton?.addEventListener("click", () => {
+            const id = personSelect.value;
+            if (!id) return;
+
+            saveManualExistingMapping(manualItem, id);
+            renderReview();
+          });
+
+          sourceType?.addEventListener("change", syncSourceTypeUi);
+
+          sourceName?.addEventListener("input", () => {
+            if (!sourceId.dataset.userEdited) {
+              sourceId.value = slugifyId(sourceName.value);
+            }
+          });
+
+          sourceId?.addEventListener("input", () => {
+            sourceId.dataset.userEdited = "1";
+          });
+
+          personNameInput?.addEventListener("input", () => {
+            if (!personIdInput.dataset.userEdited) {
+              personIdInput.value = slugifyId(personNameInput.value);
+            }
+          });
+
+          personIdInput?.addEventListener("input", () => {
+            personIdInput.dataset.userEdited = "1";
+          });
+
+          $("#manualCreateProposal", page)?.addEventListener("click", () => {
+            try {
+              saveNewEntityProposal(manualItem, {
+                sourceType: sourceType.value,
+                sourceName: sourceName.value,
+                sourceId: sourceId.value,
+                personName: personNameInput.value,
+                personId: personIdInput.value,
+                membershipStatus: membershipStatus.value,
+                parentGroupId: parentGroup.value
+              });
+
+              renderReview();
+            } catch (error) {
+              window.alert(error.message || String(error));
+            }
+          });
+
+          $("#manualReloadSource", page)?.addEventListener("click", loadLiveDances);
+
+          $("#manualSkipPattern", page)?.addEventListener("click", () => {
+            state.manualSessionSkipped.add(manualItem.key);
+            renderReview();
+          });
+
+          $("#manualIgnorePattern", page)?.addEventListener("click", () => {
+            if (!window.confirm(
+              `Ignore "${manualItem.dance.roleName}" under "${manualItem.dance.sourceArtistName}" for achievement identity matching?`
+            )) return;
+
+            saveIgnoreMapping(manualItem);
+            renderReview();
+          });
+
+          syncSourceTypeUi();
+        }
+
+        $(".js-review-unskip", page)?.addEventListener("click", () => {
+          state.reviewSessionSkipped.clear();
+          state.manualSessionSkipped.clear();
+          renderReview();
+        });
 
         $$(".js-review-export", page).forEach(button => {
           button.addEventListener("click", exportReviewDecisions);
@@ -1854,6 +2578,7 @@
         setLiveStatus("loading", "Loading live dance data…");
 
         try {
+          applyLocalEntityProposals();
           state.dances = await data.loadDanceData();
           applySavedReviewDecisions(state.dances);
           state.danceLoadState = "loaded";
@@ -1886,6 +2611,7 @@
       $("#reloadDanceData").addEventListener("click", loadLiveDances);
 
       getReviewDecisions();
+      applyLocalEntityProposals();
 
       // Static data is immediately usable; live dance data is deliberately opt-in.
       renderOverview();
