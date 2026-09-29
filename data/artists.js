@@ -1910,16 +1910,6 @@
     });
   });
 
-  const globalNameIndex = new Map();
-  Object.values(people).forEach(person => {
-    [person.name, ...(person.aliases || [])].forEach(name => {
-      const key = normalizeName(name);
-      if (!key) return;
-      if (!globalNameIndex.has(key)) globalNameIndex.set(key, []);
-      globalNameIndex.get(key).push(person.id);
-    });
-  });
-
   function resolvePersonInGroup(groupId, rawName) {
     const group = groups[groupId];
     if (!group) return null;
@@ -1933,11 +1923,6 @@
     });
 
     return candidates.length === 1 ? candidates[0] : null;
-  }
-
-  function resolvePersonGlobally(rawName) {
-    const matches = globalNameIndex.get(normalizeName(rawName)) || [];
-    return matches.length === 1 ? matches[0] : null;
   }
 
   function getPerson(personId) {
@@ -1961,7 +1946,6 @@
   root.people = people;
   root.getPerson = getPerson;
   root.resolvePersonInGroup = resolvePersonInGroup;
-  root.resolvePersonGlobally = resolvePersonGlobally;
   root.resolveSoloArtistPersonId = resolveSoloArtistPersonId;
   root.normalizePersonName = normalizeName;
 })();
