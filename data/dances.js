@@ -41,6 +41,20 @@
       "GOT the beat",
       "GOT THE BEAT"
     ]
+  },
+  "produce_48": {
+    "id": "produce_48",
+    "name": "PRODUCE 48",
+    "kind": "survival_show_project",
+    "participantIds": [
+      "kwon_eunbi"
+    ],
+    "participantsComplete": false,
+    "note": "Participant list is intentionally scoped to identities currently referenced by Hindex dance records, not the full PRODUCE 48 contestant roster.",
+    "sourceAliases": [
+      "PRODUCE 48",
+      "Produce 48"
+    ]
   }
 };
 
@@ -133,11 +147,6 @@
 
     if (!personId && !groupId && !projectId && root.resolveSoloArtistPersonId) {
       personId = root.resolveSoloArtistPersonId(sourceArtistName);
-    }
-
-    // Last-resort global exact-name lookup only. Never fuzzy-match here.
-    if (!personId && roleName && roleName !== "Backup" && root.resolvePersonGlobally) {
-      personId = root.resolvePersonGlobally(roleName);
     }
 
     const hasSpecificRole = Boolean(roleName && roleName !== "Backup");
