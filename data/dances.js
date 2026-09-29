@@ -127,45 +127,89 @@
     return "dance_" + parts.join("_").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   }
 
+  function roleMatchesPerson(personId, roleName) {
+    const person = root.people?.[personId];
+    if (!person || !roleName) return false;
+
+    const normalize = root.normalizePersonName || normalizeKey;
+    const roleKey = normalize(roleName);
+
+    return [person.name, ...(person.aliases || [])]
+      .filter(Boolean)
+      .some(name => normalize(name) === roleKey);
+  }
+
   function normalizeDance(raw, index = 0) {
     const sourceArtistName = String(raw.artist || "Unknown Artist").trim();
     const correctedRawRole = correctRoleForSource(sourceArtistName, raw.dancerRole || "");
     const roleName = normalizeRoleName(correctedRawRole);
 
+    // SOURCE identity: who owns/performs the source song or stage.
+    // ROLE identity: which specific person Hillary is covering.
+    // These are intentionally separate. A Backup role must never inherit
+    // the source artist's Person ID.
     const groupId = root.resolveGroupId ? root.resolveGroupId(sourceArtistName) : null;
     const projectId = groupId ? null : resolveProjectId(sourceArtistName);
+    const sourcePersonId = (!groupId && !projectId && root.resolveSoloArtistPersonId)
+      ? root.resolveSoloArtistPersonId(sourceArtistName)
+      : null;
 
-    let personId = null;
+    const sourceEntityType = groupId
+      ? "group"
+      : projectId
+        ? "project"
+        : sourcePersonId
+          ? "person"
+          : "unknown";
 
-    if (groupId && roleName && roleName !== "Backup" && root.resolvePersonInGroup) {
-      personId = root.resolvePersonInGroup(groupId, roleName);
-    }
+    const sourceEntityId = groupId || projectId || sourcePersonId || null;
 
-    if (!personId && projectId && roleName && roleName !== "Backup") {
-      personId = resolveProjectPersonId(projectId, roleName);
-    }
-
-    if (!personId && !groupId && !projectId && root.resolveSoloArtistPersonId) {
-      personId = root.resolveSoloArtistPersonId(sourceArtistName);
-    }
-
+    let rolePersonId = null;
     const hasSpecificRole = Boolean(roleName && roleName !== "Backup");
-    const needsReview = hasSpecificRole && !personId;
+
+    if (hasSpecificRole && groupId && root.resolvePersonInGroup) {
+      rolePersonId = root.resolvePersonInGroup(groupId, roleName);
+    }
+
+    if (!rolePersonId && hasSpecificRole && projectId) {
+      rolePersonId = resolveProjectPersonId(projectId, roleName);
+    }
+
+    // For a solo source, the role resolves to the source Person only when the
+    // role text explicitly names that Person. Backup remains null.
+    if (!rolePersonId && hasSpecificRole && sourcePersonId && roleMatchesPerson(sourcePersonId, roleName)) {
+      rolePersonId = sourcePersonId;
+    }
+
+    const needsReview = hasSpecificRole && !rolePersonId;
 
     return {
       id: buildDanceId(raw, index),
       youtubeUrl: raw.youtubeUrl || "",
       videoId: raw.videoId || "",
       sourceArtistName,
+
+      // Canonical SOURCE relationship.
+      sourceEntityType,
+      sourceEntityId,
+      sourcePersonId,
       groupId,
       projectId,
+
       songTitle: raw.songTitle || "",
       performanceDate: raw.performanceDate || "",
       location: raw.location || "",
       thumbnail: raw.thumbnail || "",
       outfitImage: raw.outfitImage || null,
+
+      // Canonical ROLE relationship.
       roleName,
-      personId,
+      rolePersonId,
+
+      // Backward-compatible alias for the current viewer/consumers.
+      // personId now always means the covered ROLE person, never the source artist.
+      personId: rolePersonId,
+
       sourceRoleCorrected: correctedRawRole !== (raw.dancerRole || ""),
       raw,
       needsReview,
