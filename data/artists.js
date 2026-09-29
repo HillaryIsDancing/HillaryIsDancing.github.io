@@ -1931,6 +1931,7 @@
 
   const soloArtistAliases = {
   "jennie": "jennie",
+  "tzuyu": "tzuyu",
   "yena": "choi_yena",
   "soojin": "soojin",
   "seulgi": "seulgi",
