@@ -1868,6 +1868,41 @@
     "aliases": [
       "Red Velvet Wendy"
     ]
+  },
+  "emma": {
+    "id": "emma",
+    "name": "Emma",
+    "aliases": []
+  },
+  "chloe_young": {
+    "id": "chloe_young",
+    "name": "Chloe Young",
+    "aliases": []
+  },
+  "hu_e": {
+    "id": "hu_e",
+    "name": "Hu'e",
+    "aliases": []
+  },
+  "ina": {
+    "id": "ina",
+    "name": "Ina",
+    "aliases": []
+  },
+  "yunseo": {
+    "id": "yunseo",
+    "name": "Yunseo",
+    "aliases": []
+  },
+  "vin": {
+    "id": "vin",
+    "name": "Vin",
+    "aliases": []
+  },
+  "kelly": {
+    "id": "kelly",
+    "name": "Kelly",
+    "aliases": []
   }
 };
 

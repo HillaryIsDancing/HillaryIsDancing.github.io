@@ -1344,6 +1344,32 @@
     "sourceUrls": [
       "https://www.triples-official.jp/profile/"
     ]
+  },
+  "badvillain": {
+    "id": "badvillain",
+    "name": "Badvillain",
+    "kind": "group",
+    "status": "active",
+    "membershipComplete": true,
+    "currentMemberIds": [
+      "emma",
+      "chloe_young",
+      "hu_e",
+      "ina",
+      "yunseo",
+      "vin",
+      "kelly"
+    ],
+    "formerMemberIds": [],
+    "memberIds": [
+      "emma",
+      "chloe_young",
+      "hu_e",
+      "ina",
+      "yunseo",
+      "vin",
+      "kelly"
+    ]
   }
 };
 
@@ -1410,7 +1436,8 @@
   "seventeen": "seventeen",
   "shinee": "shinee",
   "triples": "triples",
-  "triple s": "triples"
+  "triple s": "triples",
+  "badvillain": "badvillain"
 };
 
   function normalizeKey(value) {
