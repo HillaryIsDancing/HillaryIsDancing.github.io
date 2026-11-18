@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
+<title>Artists, Groups &amp; Achievements · HillaryIsDancing</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(at top left,#ffdaeb,transparent 40%),linear-gradient(#fff8fc,#ffeef6,#fff6fb);min-height:100vh;font:16px Arial,Helvetica,sans-serif;color:#5b4350}main{max-width:1060px;margin:auto;padding:36px 20px}header,nav{text-align:center}header small{color:#aa456f;letter-spacing:.16em;font-weight:bold}h1{color:#6b3f53;font-size:clamp(26px,4vw,46px);margin:8px 0 18px}h2,h3{margin:0 0 14px}button,input,select,textarea{font:inherit}button{cursor:pointer;padding:10px 17px;border:1px solid #e4adca;border-radius:24px;background:white;color:#783c58;font-weight:700}button:hover,button.active,.primary{background:#ffd4e7}button:disabled{opacity:.55;cursor:wait}article,details{background:#fffcfe;border:2px solid #f7d7e5;border-radius:22px;padding:22px;box-shadow:0 9px 22px #dfb1c51c}details{margin:22px 0 12px}summary{cursor:pointer;font-weight:bold}label{display:block;font-weight:bold;margin:14px 0}input,select,textarea{display:block;width:100%;padding:10px 13px;border:1px solid #dfb4c8;border-radius:12px;background:white;color:#523644;margin:6px 0}textarea{resize:vertical}#status{white-space:pre-wrap;overflow-wrap:anywhere}#layout{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(300px,1.4fr);gap:16px}.bar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}#rows{max-height:460px;overflow:auto}#rows button{display:block;width:100%;text-align:left;margin:5px 0;border-radius:12px}.hint{font-size:14px;color:#78596a;line-height:1.5}.member{display:flex;align-items:center;gap:8px;margin:6px 0}.member input{flex:1;min-width:0}.member span{flex:1}.danger{color:#943347}nav button{min-width:110px;margin:4px}button:focus-visible,input:focus-visible{outline:3px solid #bd5b89} @media(max-width:700px){#layout{grid-template-columns:1fr}#rows{max-height:180px}}
+</style>
+<main><header><small>ADMIN</small><h1>🧸 HillaryIsDancing 🎀</h1></header>
+<details id="connection" open><summary>GitHub connection</summary>
+<form id="connect"><label>Repository<input id="repo" required placeholder="owner/repository"></label>
+<label>Database branch<input id="branch" placeholder="Default branch"></label>
+<label>Repository access token<input id="token" type="password" required autocomplete="off"></label><p class="hint">Use a fine-grained GitHub token for this repository with Contents: Read and write. The token stays in this tab. Choose the branch that supplies the website’s data/ folder.</p><button>Open database</button></form></details>
+<button id="previewDemo" type="button">Preview achievements with sample data</button><p role="status" id="status">Connect to load the existing database.</p>
+<section id="workspace" hidden><nav><button id="artists">Artists</button><button id="groups">Groups</button><button id="achievements">Achievements</button></nav><div id="layout">
+<article><div class="bar"><h2 id="heading"></h2><button id="new"></button></div><input id="search" aria-label="Search records" placeholder="Search by name or ID"><div id="rows"></div></article>
+<article id="panel"></article></div></section></main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const names=['groups','artists','dances','achievements'];
+let session, snapshot, tab='artists', busy=false;
+function fail(message){throw new Error(message)}
+function el(tag,txt){const node=document.createElement(tag);if(txt!==undefined)node.textContent=txt;return node}
+function button(label,action){const b=el('button',label);b.type='button';b.onclick=action;return b}
+function norm(s){return s.trim().toLowerCase().replaceAll('’',"'").replace(/\s+/g,' ')}
+function personKey(s){return norm(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()}
+function safeKey(key){if(!key||key in Object.prototype)fail('Choose a different name or alias.');return key}
+function makeId(name,map){const base=safeKey(personKey(name).replaceAll(' ','_')||'artist_'+crypto.randomUUID().slice(0,8));let id=base,i=2;while(Object.hasOwn(map,id))id=base+'_'+i++;return id}
+function repositoryName(input){
+ const value=input.trim().replace(/^https:\/\/github\.com\//i,'').replace(/\/$/,'').replace(/\.git$/i,'');
+ if(!/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/.test(value)||['.','..'].includes(value.split('/')[1]))fail('Enter owner/repository or its GitHub repository URL.');
+ return value;
+}
+async function api(s,path,opt={}){
+ const r=await fetch('https://api.github.com/repos/'+s.repo+path,{...opt,cache:'no-store',headers:{Authorization:'Bearer '+s.token,'Accept':'application/vnd.github+json','Content-Type':'application/json',...opt.headers}});
+ if(!r.ok){const error=await r.json().catch(()=>({}));fail('GitHub '+r.status+' ('+path.split('?')[0]+'): '+(error.message||r.statusText))}
+ return opt.raw?r.text():r.json();
+}
+async function readSources(s,sha){return Object.fromEntries(await Promise.all(names.map(async n=>[n,await api(s,'/contents/data/'+n+'.js?ref='+sha,{raw:true,headers:{Accept:'application/vnd.github.raw+json'}})])))}
+// v6 emits JSON objects inside its JS modules. Preserve all surrounding executable source.
+function block(source,key){
+ const declarations=[...source.matchAll(new RegExp('^[ \\t]*const\\s+'+key+'\\s*=\\s*(?=\\{)','gm'))];
+ if(declarations.length!==1)fail('Unsupported database layout: '+key);
+ const declaration=declarations[0];
+ const start=declaration.index+declaration[0].length;let depth=0,quoted=false,escaped=false;
+ for(let i=start;i<source.length;i++){const c=source[i];
+  if(quoted){if(escaped)escaped=false;else if(c==='\\')escaped=true;else if(c==='"')quoted=false;continue}
+  if(c==='"'){quoted=true;continue}
+  if(c==='{')depth++;
+  if(c==='}'&&--depth===0){const original=source.slice(start,i+1);return {start,end:i+1,value:JSON.parse(original)}}
+ }
+ fail('Unreadable database section: '+key);
+}
+const sections={groups:['groups','groupAliases'],artists:['people','soloArtistAliases'],dances:['projects']};
+function unpack(files){const db={};for(const [file,keys] of Object.entries(sections))for(const k of keys)db[k]=block(files[file],k).value;return db}
+function encode(files,db){const out={...files};for(const file of ['groups','artists'])for(const k of sections[file]){
+ const b=block(out[file],k);if(JSON.stringify(b.value)!==JSON.stringify(db[k]))out[file]=out[file].slice(0,b.start)+JSON.stringify(db[k],null,2)+out[file].slice(b.end)
+ }return out}
+async function openDB(s){const c=await api(s,'/commits/'+encodeURIComponent(s.branch));const files=await readSources(s,c.sha);unpack(files);return {sha:c.sha,tree:c.commit.tree.sha,files}}
+async function writeChange(title,mutate,files){
+ if(!files){const db=unpack(snapshot.files);mutate(db);files=encode(snapshot.files,db)}
+ const changed=names.filter(k=>files[k]!==snapshot.files[k]);if(!changed.length)fail('No changes to save.');
+ const s=session;const post=(path,body,method='POST')=>api(s,path,{method,body:JSON.stringify(body)});
+ const tree=await post('/git/trees',{base_tree:snapshot.tree,tree:changed.map(k=>({path:'data/'+k+'.js',mode:'100644',type:'blob',content:files[k]}))});
+ const commit=await post('/git/commits',{message:title,tree:tree.sha,parents:[snapshot.sha]});
+ // Once an update is sent, a network error can hide a successful write.
+ snapshot=null;
+ let updated=false;
+ try{
+  await post('/git/refs/heads/'+s.branch.split('/').map(encodeURIComponent).join('/'),{sha:commit.sha,force:false},'PATCH');
+  updated=true;
+  const next=await openDB(s);
+  if(changed.some(k=>next.files[k]!==files[k]))fail('Branch data changed during verification.');
+  snapshot=next;
+ }catch(error){
+  fail((updated?'Branch updated; read-back could not verify the result. ':'Could not confirm the branch update. ')+
+   'Check '+s.repo+' / '+s.branch+' before retrying. Candidate commit: '+commit.sha.slice(0,8)+'. '+error.message);
+ }
+ render();$('status').textContent=title+' · verified in '+s.repo+' / '+s.branch+' · '+commit.sha.slice(0,8);
+}
+async function run(fn){
+ if(busy)return;busy=true;$('workspace').inert=true;$('connection').inert=true;$('status').textContent='Working…';
+ try{await fn()}catch(e){$('status').textContent=e.message+'  Reopen the database to refresh before retrying.';if(!snapshot){$('workspace').hidden=true;$('connection').open=true}}
+ finally{busy=false;$('workspace').inert=false;$('connection').inert=false}
+}
+$('connect').onsubmit=e=>{e.preventDefault();run(async()=>{
+ demo=false;session=null;snapshot=null;$('workspace').hidden=true;
+ const s={repo:repositoryName($('repo').value),token:$('token').value.trim(),branch:$('branch').value.trim()};
+ if(!s.branch)s.branch=(await api(s,'')).default_branch;const data=await openDB(s);
+ session=s;snapshot=data;$('previewDemo').hidden=true;$('token').value='';$('branch').value=s.branch;$('connection').open=false;$('workspace').hidden=false;
+ $('status').textContent=s.repo+' / '+s.branch+' · '+data.sha.slice(0,8);render()
+})};
+if(location.hostname.endsWith('.github.io')){const owner=location.hostname.split('.')[0];$('repo').value=owner+'/'+(location.pathname.split('/').filter(Boolean).slice(0,-1)[0]||owner+'.github.io')}
+function records(db){return tab==='artists'?db.people:db.groups}
+function list(){
+ if(tab==='achievements')return ruleList();
+ const db=unpack(snapshot.files),q=norm($('search').value);
+ const items=Object.values(records(db)).filter(r=>norm(r.name+' '+r.id).includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
+ $('rows').replaceChildren(...items.map(r=>button(r.name+' · '+r.id,()=>detail(r.id))));
+ if(!items.length)$('rows').append(el('p','No matches.'));
+}
+function render(){
+ for(const n of ['artists','groups'])$(n).hidden=demo;
+ if(tab==='achievements'){
+ $('heading').textContent='Achievements';$('new').textContent='+ Add Achievement';
+ for(const n of ['artists','groups','achievements'])$(n).classList.toggle('active',n===tab);
+ $('panel').replaceChildren(el('h2','Completion rules'),el('p','Choose an achievement to edit its name and condition.'));ruleList();return;
+ }
+ $('achievements').classList.toggle('active',false);
+ $('heading').textContent=tab==='artists'?'Artists':'Groups';$('new').textContent=tab==='artists'?'+ Add Artist':'+ Add Group';
+ for(const n of ['artists','groups'])$(n).classList.toggle('active',tab===n);
+ $('panel').replaceChildren(el('h2',tab==='artists'?'Artist details':'Group details'),el('p','Select a record or add a new one.'));list();
+}
+for(const n of ['artists','groups','achievements'])$(n).onclick=()=>{tab=n;$('search').value='';render()};
+$('search').oninput=list;
+const memberFields=['memberIds','currentMemberIds','formerMemberIds'];
+function detail(id){
+ const db=unpack(snapshot.files),r=records(db)[id],artist=tab==='artists';
+ const related=artist?Object.values(db.groups).filter(g=>g.memberIds.includes(id)).map(g=>g.name):r.memberIds.map(p=>db.people[p]?.name||p);
+ const del=button(artist?'Delete Artist':'Delete Group',()=>{
+ if(!confirm('Delete '+r.name+' ('+id+') from '+session.repo+' / '+session.branch+'? '+(artist?'This removes their group memberships.':'Member artist records will be kept.')+' Historical cover matches may change.'))return;
+ run(()=>writeChange('Delete '+r.name,d=>{
+ if(artist){
+  if(readDefinitions(snapshot.files.achievements).rules.some(rule=>rule.personId===id))fail('An achievement uses this artist. Change its condition before deleting.');
+  if(Object.values(d.projects).some(p=>p.participantIds?.includes(id)))fail('This artist is referenced by a collaboration project.');
+  for(const g of Object.values(d.groups))for(const f of memberFields)if(g[f])g[f]=g[f].filter(x=>x!==id);
+  delete d.people[id];dropAliases(d.soloArtistAliases,id);
+ }else{
+  if(Object.values(d.groups).some(g=>g.parentGroupId===id))fail('A sub-unit still uses this parent group.');
+  const refs=[...snapshot.files.achievements.matchAll(/["']?groupId["']?\s*:\s*["']([^"']+)["']/g)];
+  if(refs.some(m=>m[1]===id))fail('An existing achievement uses this group.');
+  delete d.groups[id];dropAliases(d.groupAliases,id);
+ }
+ }));});
+ del.className='danger';$('panel').replaceChildren(el('h2',r.name),el('p','ID · '+id),el('h3',artist?'Groups':'Members'),el('p',related.join(' · ')||'None'),del);
+ if(!artist&&r.memberIds.length){
+ const pick=el('select');for(const pid of r.memberIds)pick.add(new Option((db.people[pid]?.name||pid)+(r.formerMemberIds.includes(pid)?' (former)':''),pid));field($('panel'),'Change membership',pick);
+ const change=former=>{const pid=pick.value;if(former&&r.formerMemberIds.includes(pid))return;
+ const label=former?'Mark as former member':'Remove incorrect membership';if(!confirm(label+' · '+(db.people[pid]?.name||pid)+' / '+r.name+'? The artist record will be kept.'))return;
+ run(()=>writeChange(label+' · '+pid+' / '+id,d=>{const g=d.groups[id];if(former){g.currentMemberIds=g.currentMemberIds.filter(x=>x!==pid);if(!g.formerMemberIds.includes(pid))g.formerMemberIds.push(pid)}else for(const f of memberFields)g[f]=g[f].filter(x=>x!==pid)}))};
+ $('panel').append(button('Mark as former',()=>change(true)),button('Remove membership',()=>change(false)));
+ }
+}
+function dropAliases(map,id){for(const k of Object.keys(map))if(map[k]===id)delete map[k]}
+function field(parent,label,control){const l=el('label',label);l.append(control);parent.append(l);return control}
+function registerAlias(map,key,id){safeKey(key);if(Object.hasOwn(map,key)&&map[key]!==id)fail('Name already in use: '+key);map[key]=id}
+function validateMemberNames(people,existingIds,person){
+ const keys=new Set([person.name,...person.aliases].map(personKey).filter(Boolean));
+ if(!keys.size)fail('Add a romanized stage name or alias so dance records can match this artist.');
+ for(const id of existingIds){
+  const other=people[id];
+  if([other.name,...other.aliases].some(name=>keys.has(personKey(name))))fail('A name or alias already matches '+other.name+' in this group.');
+ }
+}
+function createPerson(db,name,aliases=[]){name=name.trim();if(!name)fail('Enter an artist name.');
+ const id=makeId(name,db.people); db.people[id]={id,name,aliases};return id}
+function editor(){
+ const artist=tab==='artists',db=unpack(snapshot.files),panel=$('panel'),form=el('form');
+ panel.replaceChildren(el('h2',artist?'Add New Artist':'Add New Group'),form);
+ const name=field(form,artist?'Stage name':'Group name',el('input'));name.required=true;
+ let group,aliases,lines,verified;
+ if(artist){
+ aliases=field(form,'Aliases (comma separated)',el('input'));group=field(form,'Group',el('select'));group.add(new Option('Solo artist',''));
+ for(const g of Object.values(db.groups).sort((a,b)=>a.name.localeCompare(b.name)))group.add(new Option(g.name,g.id));
+ }else{
+ form.append(el('h3','Members'));lines=el('div');form.append(lines);
+ const add=(existing)=>{const row=el('div');row.className='member';const c=existing?el('select'):el('input');c.dataset.kind=existing?'existing':'new';c.required=true;c.setAttribute('aria-label',existing?'Existing artist':'New member name');
+ if(existing){c.add(new Option('Choose an artist',''));for(const p of Object.values(db.people).sort((a,b)=>a.name.localeCompare(b.name)))c.add(new Option(p.name+' · '+p.id,p.id))}else c.placeholder='New member name';
+ row.append(c,button('Remove',()=>row.remove()));lines.append(row)};
+ add(false);form.append(button('+ New member',()=>add(false)),button('+ Existing artist',()=>add(true)));
+ verified=field(form,'Official debut lineup is complete',el('input'));verified.type='checkbox';verified.style.width='auto';
+ }
+ const submit=el('button','Save to database');submit.className='primary';form.append(submit);name.focus();
+ form.onsubmit=e=>{e.preventDefault();run(()=>writeChange('Add '+name.value.trim(),d=>{
+ const title=name.value.trim();if(!title)fail('Enter a name.');
+ if(artist){
+ const alias=[...new Set(aliases.value.split(',').map(x=>x.trim()).filter(Boolean))];
+ const g=d.groups[group.value];const matches=Object.values(d.people).filter(p=>norm(p.name)===norm(title));
+ if(matches.some(p=>g?g.memberIds.includes(p.id):Object.values(d.soloArtistAliases).includes(p.id)))fail('This artist already exists here.');
+ if(matches.length&&!confirm('An artist already uses this name. Create a separate person?'))fail('Creation cancelled.');
+ const id=createPerson(d,title,alias);
+ if(g){validateMemberNames(d.people,g.memberIds,d.people[id]);g.currentMemberIds.push(id);g.memberIds.push(id)}else for(const a of [title,...alias])registerAlias(d.soloArtistAliases,personKey(a),id);
+ }else{
+ if(Object.values(d.projects).some(p=>[p.name,...(p.sourceAliases||[])].some(a=>norm(a)===norm(title))))fail('A collaboration project already uses this group name.');
+ const id=makeId(title,d.groups);registerAlias(d.groupAliases,norm(title),id);
+ const ids=[],seen=new Set();
+ for(const c of lines.querySelectorAll('[data-kind]')){
+ const existing=c.dataset.kind==='existing',label=existing?d.people[c.value].name:c.value.trim();
+ if(!label||seen.has(norm(label)))fail('Enter distinct member names.');seen.add(norm(label));
+ if(!existing&&Object.values(d.people).some(p=>norm(p.name)===norm(label))&&!confirm(label+' already exists. Create a distinct person with the same name?'))fail('Use + Existing artist to link the original record.');
+ const pid=existing?c.value:createPerson(d,label);
+ validateMemberNames(d.people,ids,d.people[pid]);ids.push(pid);
+ }
+ if(!ids.length)fail('Add at least one member.');
+ d.groups[id]={id,name:title,kind:'group',status:'active',membershipComplete:verified.checked,currentMemberIds:ids,formerMemberIds:[],memberIds:[...ids]};
+ }
+ }))};
+}
+// Calculate progress from the normalized cover rows produced by dances.js.
+function countCoverMilestone(rule, dances, data) {
+ const songs = new Set(), groups = new Set(), performances = new Set(), roles = new Map();
+ const clean = value => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+ for (const [i, dance] of (dances || []).entries()) {
+  const group = data.groups?.[dance.groupId];
+  const title = clean(dance.songTitle);
+  const solo = data.resolveSoloArtistPersonId?.(dance.sourceArtistName);
+  const source = group ? 'group:'+group.id : dance.projectId ? 'project:'+dance.projectId : solo ? 'solo:'+solo : clean(dance.sourceArtistName);
+  if (title && source && (rule.type !== 'group_songs' || group?.id === rule.groupId)) {
+   songs.add(JSON.stringify([source,title]));
+  }
+  if (group) groups.add(group.id);
+  if (!dance.personId || clean(dance.roleName) === 'backup') continue;
+  if (dance.personId === rule.personId) performances.add(dance.videoId || dance.id || i);
+  if (group) {
+   if (!roles.has(group.id)) roles.set(group.id,new Set());
+   roles.get(group.id).add(dance.personId);
+  }
+ }
+ if (rule.type === 'artist_times') return performances.size;
+ if (rule.type === 'distinct_groups') return groups.size;
+ if (rule.type === 'complete_groups') {
+  return Object.values(data.groups || {}).filter(group => {
+   const ids = new Set(group.memberIds);
+   return group.membershipComplete && ids.size > 1 && [...ids].every(id => roles.get(group.id)?.has(id));
+  }).length;
+ }
+ return songs.size;
+}
+
+const ruleLabels = {
+ distinct_songs:'Different songs covered', artist_times:'Times covering an artist',
+ distinct_groups:'Different groups covered', complete_groups:'Groups with every role covered',
+ group_songs:'Different songs by one group', unique_people:'Different individual artists covered',
+ cover_all_group_members:'Every member of one group (existing rule)'
+};
+function readDefinitions(source) {
+ const declaration = /^\s*const achievements\s*=\s*(?=\[)/m.exec(source);
+ if (!declaration) fail('Cannot locate the achievement definitions in this version.');
+ const start=declaration.index+declaration[0].length;
+ // The legacy list uses JS object keys. Accept only data literals, never run repository code.
+ const tokens=source.slice(start).matchAll(/"(?:\\.|[^"\\])*"|[\[\]]/g);
+ let depth=0;
+ for (const token of tokens) {
+  if(token[0]==='[')depth++;
+  if(token[0]!==']'||--depth!==0)continue;
+  const end=start+token.index+1;
+  const json=source.slice(start,end).replace(/"(?:\\.|[^"\\])*"|([A-Za-z_$][\w$]*)(?=\s*:)/g,(whole,key)=>key?JSON.stringify(key):whole);
+  return {start,end,rules:JSON.parse(json)};
+ }
+ fail('Incomplete achievement definitions.');
+}
+function updateRules(source, rules) {
+ const list=readDefinitions(source);
+ let result=source.slice(0,list.start)+JSON.stringify(rules,null,2)+source.slice(list.end);
+ if (!result.includes('function countCoverMilestone(')) {
+  const entry='function evaluateAchievement(achievement, dances) {';
+  if(!result.includes(entry))fail('Unrecognized evaluator. The database has not been written.');
+  result=result.replace(entry,()=>countCoverMilestone.toString()+'\n\n  '+entry+`
+    if (['artist_times','distinct_groups','complete_groups','group_songs','distinct_songs'].includes(achievement.type)) {
+      const actual = countCoverMilestone(achievement, dances, root);
+      const total = achievement.target;
+      return { ...achievement, actual, total, current: Math.min(actual,total), unlocked: total > 0 && actual >= total };
+    }`);
+ }
+ return result;
+}
+function ruleList(){
+ const defs=readDefinitions(snapshot.files.achievements).rules;
+ const q=norm($('search').value);
+ const rows=defs.filter(r=>norm([r.title,r.id,ruleLabels[r.type]].join(' ')).includes(q));
+ $('rows').replaceChildren(...rows.map(r=>button(r.title,()=>achievementForm(r))));
+ if(!rows.length)$('rows').append(el('p','No matching achievements.'));
+}
+function ruleText(type,target,person,group){
+ switch(type){
+  case 'artist_times':return 'Cover '+person+'’s role in '+target+' different performances.';
+  case 'distinct_groups':return 'Cover songs by '+target+' different groups.';
+  case 'complete_groups':return 'Cover every member’s role in '+target+' verified groups with at least two members.';
+  case 'group_songs':return 'Cover '+target+' different songs by '+group+'.';
+  case 'unique_people':return 'Cover '+target+' different people.';
+  case 'cover_all_group_members':return 'Cover every officially debuted member of '+group+'.';
+  default:return 'Cover '+target+' different songs.';
+ }
+}
+function achievementForm(original){
+ const db=unpack(snapshot.files),panel=$('panel'),form=el('form');
+ panel.replaceChildren(el('h2',original?'Edit Achievement':'Add Achievement'),form);
+ if(original&&!Object.hasOwn(ruleLabels,original.type)){form.append(el('p','This custom rule is managed by its original evaluator.'));return}
+ const title=field(form,'Achievement name',el('input'));title.required=true;title.value=original?.title||'';
+ const type=field(form,'Completion rule',el('select'));
+ for(const [k,v] of Object.entries(ruleLabels))type.add(new Option(v,k));
+ type.value=original?.type||'distinct_songs';
+ const selector=(label,records,selected)=>{
+  const node=field(form,label,el('select'));
+  for(const r of Object.values(records).sort((a,b)=>a.name.localeCompare(b.name)))node.add(new Option(r.name+' · '+r.id,r.id));
+  if(selected)node.value=selected;return node;
+ };
+ const person=selector('Artist',db.people,original?.personId),group=selector('Group',db.groups,original?.groupId);
+ const target=field(form,'Unlock at',el('input'));target.type='number';target.min='1';target.step='1';target.value=original?.target||1;
+ const preview=el('p');preview.className='hint';form.append(preview);
+ const progress=el('p');if(demo)form.append(progress);
+ function refresh(){
+  person.parentElement.hidden=type.value!=='artist_times';
+  group.parentElement.hidden=!['group_songs','cover_all_group_members'].includes(type.value);
+  target.parentElement.hidden=type.value==='cover_all_group_members';target.disabled=target.parentElement.hidden;
+  preview.textContent=ruleText(type.value,target.value,db.people[person.value]?.name,db.groups[group.value]?.name);
+  if(demo){const actual=demoCount({type:type.value,groupId:group.value,personId:person.value});const goal=target.disabled?db.groups[group.value]?.memberIds.length:Number(target.value);progress.textContent='Sample progress · '+actual+' / '+goal+(actual>=goal&&goal>0?' · Unlocked':'');}
+ }
+ form.oninput=refresh;refresh();
+ const save=el('button',demo?'Save preview achievement':'Save to database');save.className='primary';form.append(save);
+ form.onsubmit=e=>{e.preventDefault();run(async()=>{
+  refresh();const name=title.value.trim();if(!name)fail('Enter an achievement name.');
+  const value=Number(target.value);
+  if(!target.disabled&&(!Number.isSafeInteger(value)||value<1))fail('Enter a positive whole number.');
+  const defs=readDefinitions(snapshot.files.achievements).rules;
+  const record={...original,id:original?.id||'achievement_'+crypto.randomUUID(),title:name,type:type.value,description:preview.textContent,icon:original?.icon||'🏆'};
+  delete record.groupId;delete record.personId;delete record.target;
+  if(type.value==='cover_all_group_members'&&!db.groups[group.value]?.membershipComplete)fail('Choose a group with a verified lineup.');
+  if(!target.disabled)record.target=value;
+  if(!group.parentElement.hidden)record.groupId=group.value;
+  if(!person.parentElement.hidden)record.personId=person.value;
+  if(original)defs[defs.findIndex(r=>r.id===original.id)]=record;else defs.push(record);
+  const source=updateRules(snapshot.files.achievements,defs);
+  if(demo){snapshot.files.achievements=source;render();$('status').textContent='Preview saved in this tab.';return}
+  await writeChange('Save achievement · '+name,null,{...snapshot.files,achievements:source});
+ })};
+}
+const sampleDances=[
+ {id:'a',groupId:'twice',personId:'sana',songTitle:'Talk that Talk'},
+ {id:'b',groupId:'twice',personId:'sana',songTitle:'Talk that Talk'},
+ {id:'c',groupId:'twice',personId:'momo',songTitle:'Feel Special'},
+ {id:'d',groupId:'duo',personId:'lina',songTitle:'Glow'},
+ {id:'e',groupId:'duo',personId:'mina_demo',songTitle:'Glow'}
+];
+function demoCount(r){
+ if(r.type==='unique_people')return new Set(sampleDances.map(d=>d.personId)).size;
+ if(r.type==='cover_all_group_members')return new Set(sampleDances.filter(d=>d.groupId===r.groupId).map(d=>d.personId)).size;
+ return countCoverMilestone(r,sampleDances,unpack(snapshot.files));
+}
+let demo=false;
+$('previewDemo').onclick=()=>{
+ if(busy)return;demo=true;session=null;tab='achievements';
+ const record=(id,name,memberIds)=>({id,name,memberIds,membershipComplete:true});
+ const groups={twice:record('twice','TWICE',['sana','momo','nayeon','jeongyeon','jihyo','mina','dahyun','chaeyoung','tzuyu']),duo:record('duo','Demo Duo',['lina','mina_demo'])};
+ const people={};for(const g of Object.values(groups))for(const id of g.memberIds)people[id]={id,name:id==='mina_demo'?'Mina (Demo Duo)':id[0].toUpperCase()+id.slice(1)};
+ const declaration=(name,obj)=>'const '+name+' = '+JSON.stringify(obj)+';\n';
+ const defs=[['distinct_songs','Song Collector',5],['artist_times','Sana Spotlight',3],['distinct_groups','Group Explorer',5],['complete_groups','Full Lineup',1],['group_songs','TWICE · Five Songs',5]].map(([type,title,target])=>({id:type,type,title,target,...(type==='artist_times'?{personId:'sana'}:{}),...(type==='group_songs'?{groupId:'twice'}:{})}));
+ snapshot={files:{groups:declaration('groups',groups)+declaration('groupAliases',{}),artists:declaration('people',people)+declaration('soloArtistAliases',{}),dances:declaration('projects',{}),achievements:'const achievements = '+JSON.stringify(defs)+';\nfunction countCoverMilestone(){}'}};
+ $('workspace').hidden=false;$('connection').open=false;$('search').value='';$('status').textContent='Preview · 5 sample performances. Changes stay in this tab. Open GitHub connection to use your database.';render();achievementForm(defs[0]);
+};
+
+$('new').onclick=()=>tab==='achievements'?achievementForm():editor();
+</script></html>
