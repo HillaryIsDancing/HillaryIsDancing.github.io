@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="theme-color" content="#fff7fa">
+<title>Achievements · HillaryIsDancing</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:#fff8fb;color:#462f40;font:1rem/1.55 Inter,system-ui,sans-serif}
+main{max-width:970px;margin:auto;padding:clamp(36px,8vw,84px) 20px}
+header{border-bottom:1px solid #eed6e0;padding-bottom:26px}
+.brand{margin:0;color:#944766;font-size:.95rem;font-weight:650}
+h1{font-size:clamp(2.3rem,7vw,4rem);letter-spacing:-.05em;line-height:1.05;margin:.35em 0 0}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0}
+button{cursor:pointer;font:inherit}
+.filters button,.retry{border:1px solid #e1c4d1;border-radius:30px;padding:9px 17px;background:white;color:#634454;font-size:.875rem;font-weight:650}
+.filters button[aria-pressed=true]{background:#6b354e;color:white;border-color:#6b354e}
+button:focus-visible,summary:focus-visible{outline:3px solid #b73573;outline-offset:3px}
+#cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;align-items:start}
+article{background:white;border:1px solid #edd9e3;border-radius:18px;padding:22px;min-width:0;overflow-wrap:anywhere}
+article header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border:0;padding:0}
+h2{font-size:1.18rem;line-height:1.35;margin:0}
+.badge{font-size:.8rem;font-weight:650;padding:3px 10px;border-radius:20px;background:#f4edf1;color:#685561}
+.earned{background:#e5f4eb;color:#286044}
+p{margin:12px 0}article p,summary,#status{color:#755969}
+.meter{display:flex;align-items:center;gap:12px;font-size:.875rem;font-variant-numeric:tabular-nums}
+progress{width:100%;height:7px;flex:1;border:0;border-radius:20px;background:#f3e4eb;color:#c75283;accent-color:#c75283}
+progress::-webkit-progress-bar{background:#f3e4eb;border-radius:20px}
+progress::-webkit-progress-value{background:#c75283;border-radius:20px}
+progress::-moz-progress-bar{background:#c75283;border-radius:20px}
+details{border-top:1px solid #f2e5ec;margin-top:16px;padding-top:10px;font-size:.9rem}
+summary{cursor:pointer}ol{padding-left:1.35rem}li{margin:5px 0}
+</style>
+</head>
+<body>
+<main>
+<header><p class="brand">HillaryIsDancing 🎀</p><h1>Achievements</h1></header>
+<div class="filters" role="group" aria-label="Filter achievements">
+<button data-filter="all" aria-pressed="true">ALL</button>
+<button data-filter="unlocked" aria-pressed="false">UNLOCKED</button>
+<button data-filter="locked" aria-pressed="false">LOCKED</button>
+</div>
+<p id="status" role="status">Loading achievements…</p>
+<button class="retry" hidden onclick="location.reload()">Try again</button>
+<section id="cards" aria-label="Achievements"></section>
+</main>
+<script>
+'use strict';
+const cards=document.querySelector('#cards');
+const statusLine=document.querySelector('#status');
+const filters=[...document.querySelectorAll('[data-filter]')];
+let selected='all', records=null;
+function node(tag,text,css){
+ const element=document.createElement(tag);
+ if(text!==undefined)element.textContent=text;
+ if(css)element.className=css;
+ return element;
+}
+function summarize(record,data){
+ const rules=record.conditions||[];
+ if(rules.length<2)return record.description||'';
+ const first=rules[0],group=data.groups?.[first.scopeGroup];
+ if(record.match==='all'&&first.type==='artist_times'&&group?.membershipComplete&&rules.every(r=>
+  r.type==='artist_times'&&r.scopeGroup===group.id&&r.target===1&&group.memberIds.includes(r.personId))){
+  const members=new Set(rules.map(r=>r.personId));
+  if(group.memberIds.every(id=>members.has(id)))return 'Cover all '+members.size+' members of '+group.name+' at least once.';
+ }
+ return (record.match==='any'?'Complete any one of ':'Complete all ')+rules.length+' conditions.';
+}
+function card(record){
+ const box=node('article'),head=node('header'),earned=record.unlocked;
+ head.append(node('h2',record.title),node('span',earned?'Unlocked':'Locked','badge'+(earned?' earned':'')));box.append(head);
+ const description=summarize(record,window.HID_DATA);
+ if(description)box.append(node('p',description));
+ if(record.total>0){
+  const line=node('div',undefined,'meter'),bar=node('progress');
+  bar.max=record.total;bar.value=record.current;bar.setAttribute('aria-label','Achievement progress');
+  line.append(bar,node('span',record.current+' / '+record.total));box.append(line);
+ }
+ if(record.conditions?.length>1){
+  const details=node('details'),list=node('ol');
+  const parts=(record.description||'').split(record.match==='any'?' OR ':' AND ');
+  for(const item of parts)if(item)list.append(node('li',item));
+  if(list.childElementCount){details.append(node('summary','View conditions'),list);box.append(details)}
+ }
+ return box;
+}
+function render(){
+ filters.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filter===selected)));
+ if(records===null)return;
+ const visible=records.filter(r=>selected==='all'||(selected==='unlocked')===r.unlocked);
+ cards.replaceChildren(...visible.map(card));
+ statusLine.textContent=visible.length?'':({all:'No achievements yet.',unlocked:'No achievements unlocked yet.',locked:'No locked achievements.'})[selected];
+}
+filters.forEach(b=>b.addEventListener('click',()=>{selected=b.dataset.filter;render()}));
+async function start(){
+ const base=location.protocol==='file:'?'https://hillaryisdancing.github.io/data/':'./data/';
+ try{
+  for(const name of ['groups','artists','dances','achievements']){
+   await new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.onload=resolve;script.onerror=reject;
+    script.src=base+name+'.js';document.head.append(script);
+   });
+  }
+  const data=window.HID_DATA;
+  const dances=await data.loadDanceData();
+  records=data.evaluateAllAchievements(dances).sort((a,b)=>Number(b.unlocked)-Number(a.unlocked));
+  render();
+ }catch{
+  statusLine.textContent='Could not load achievement progress. Please try again.';
+  document.querySelector('.retry').hidden=false;
+ }
+}
+start();
+</script>
+</body>
+</html>
