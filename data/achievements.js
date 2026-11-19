@@ -85,6 +85,22 @@
     ],
     "description": "Cover Chaeyoung’s role in 1 different performances. Group: TWICE. AND Cover Dahyun’s role in 1 different performances. Group: TWICE. AND Cover Jeongyeon’s role in 1 different performances. Group: TWICE. AND Cover Jihyo’s role in 1 different performances. Group: TWICE. AND Cover Mina’s role in 1 different performances. Group: TWICE. AND Cover Momo’s role in 1 different performances. Group: TWICE. AND Cover Nayeon’s role in 1 different performances. Group: TWICE. AND Cover Sana’s role in 1 different performances. Group: TWICE. AND Cover Tzuyu’s role in 1 different performances. Group: TWICE.",
     "icon": "🏆"
+  },
+  {
+    "id": "achievement_ca25c91b-398f-4e4a-8063-2e4f7dde9cf1",
+    "title": "Wonheelary",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "artist_times",
+        "target": 6,
+        "scopeGroup": "illit",
+        "personId": "wonhee"
+      }
+    ],
+    "description": "Cover Wonhee’s role in 6 different performances. Group: ILLIT.",
+    "icon": "🏆"
   }
 ];
 
