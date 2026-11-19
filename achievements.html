@@ -4,39 +4,77 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow,noarchive">
-<meta name="theme-color" content="#fff7fa">
-<title>Achievements · HillaryIsDancing</title>
+<meta name="theme-color" content="#ffeef6">
+<title>Hindex · Achievements</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:#fff8fb;color:#462f40;font:1rem/1.55 Inter,system-ui,sans-serif}
-main{max-width:970px;margin:auto;padding:clamp(36px,8vw,84px) 20px}
-header{border-bottom:1px solid #eed6e0;padding-bottom:26px}
-.brand{margin:0;color:#944766;font-size:.95rem;font-weight:650}
-h1{font-size:clamp(2.3rem,7vw,4rem);letter-spacing:-.05em;line-height:1.05;margin:.35em 0 0}
-.filters{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0}
-button{cursor:pointer;font:inherit}
-.filters button,.retry{border:1px solid #e1c4d1;border-radius:30px;padding:9px 17px;background:white;color:#634454;font-size:.875rem;font-weight:650}
-.filters button[aria-pressed=true]{background:#6b354e;color:white;border-color:#6b354e}
-button:focus-visible,summary:focus-visible{outline:3px solid #b73573;outline-offset:3px}
-#cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;align-items:start}
-article{background:white;border:1px solid #edd9e3;border-radius:18px;padding:22px;min-width:0;overflow-wrap:anywhere}
-article header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border:0;padding:0}
-h2{font-size:1.18rem;line-height:1.35;margin:0}
-.badge{font-size:.8rem;font-weight:650;padding:3px 10px;border-radius:20px;background:#f4edf1;color:#685561}
-.earned{background:#e5f4eb;color:#286044}
-p{margin:12px 0}article p,summary,#status{color:#755969}
-.meter{display:flex;align-items:center;gap:12px;font-size:.875rem;font-variant-numeric:tabular-nums}
-progress{width:100%;height:7px;flex:1;border:0;border-radius:20px;background:#f3e4eb;color:#c75283;accent-color:#c75283}
-progress::-webkit-progress-bar{background:#f3e4eb;border-radius:20px}
-progress::-webkit-progress-value{background:#c75283;border-radius:20px}
-progress::-moz-progress-bar{background:#c75283;border-radius:20px}
-details{border-top:1px solid #f2e5ec;margin-top:16px;padding-top:10px;font-size:.9rem}
-summary{cursor:pointer}ol{padding-left:1.35rem}li{margin:5px 0}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #5b4350;
+  background:
+    radial-gradient(circle at top left, rgba(255,215,235,.95), transparent 28%),
+    radial-gradient(circle at top right, rgba(255,230,240,.9), transparent 24%),
+    linear-gradient(180deg, #fff8fc 0%, #ffeef6 45%, #fff6fb 100%);
+}
+main { width: min(1120px, 92%); margin: auto; padding: 48px 0 64px; }
+.hero { text-align: center; margin-bottom: 32px; }
+.wordmark {
+  display: inline-flex; align-items: baseline; justify-content: center; gap: .26em;
+  position: relative; margin: 0; color: #6b3f53; font-size: clamp(38px, 7vw, 56px); line-height: 1.1;
+}
+.wordmark::before, .wordmark::after { position: absolute; opacity: .9; }
+.wordmark::before { content: "🧸"; right: calc(100% + .95em); top: -.15em; font-size: .5em; }
+.wordmark::after { content: "🐈"; left: calc(100% + 1.4em); top: 0; font-size: .4em; }
+.bear { font-size: .7em; color: #cc7aa2; }
+.subtitle { color: #8d6b7d; font-size: 17px; margin: 14px 0 0; }
+.filters { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+button { cursor: pointer; font: inherit; }
+.filters button, .retry {
+  border: 2px solid #f2c6da; border-radius: 999px; padding: 10px 20px;
+  font-size: 14px; font-weight: bold; color: #79435d; background: rgba(255,255,255,.95);
+}
+.filters button[aria-pressed=true], .retry {
+  color: #562b43; background: linear-gradient(135deg,#ff8fc2,#f7a6cf);
+  border-color: transparent; box-shadow: 0 10px 22px rgba(233,141,186,.28);
+}
+.filters button:hover, .retry:hover { border-color: #e68ab2; }
+button:focus-visible, summary:focus-visible { outline: 3px solid #ae3672; outline-offset: 3px; }
+#status { text-align: center; margin: 18px 0 22px; font-weight: 600; color: #8a677a; }
+.retry:not([hidden]) { display: block; margin: 0 auto; }
+#cards { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,310px),1fr)); gap: 22px; }
+article {
+  min-width: 0; display: flex; flex-direction: column; padding: 20px; overflow-wrap: anywhere;
+  border: 2px solid #f7d7e5; border-radius: 24px; background: rgba(255,255,255,.95);
+  box-shadow: 0 10px 24px rgba(221,181,199,.18);
+}
+article header { display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; }
+h2 { margin: 0; font-size: 1.55rem; line-height: 1.14; color: #5b4350; }
+.badge {
+  font-size: .78rem; line-height: 1.25; letter-spacing: .08em; text-transform: uppercase;
+  font-weight: 750; color: #82687b; background: #f6eff4; border-radius: 999px; padding: 5px 10px;
+}
+.earned { background: #fff0f7; color: #a7346a; }
+article p { margin: 12px 0 18px; color: #806375; line-height: 1.5; }
+.meter { margin-top: auto; display: flex; align-items: center; gap: 12px; color: #815468; font-weight: 600; font-size: .875rem; }
+progress { width: 100%; min-width: 0; height: 8px; flex: 1; appearance: none; border: none; border-radius: 999px; background: #f9e3ee; }
+progress::-webkit-progress-bar { background: #f9e3ee; border-radius: 999px; }
+progress::-webkit-progress-value { background: linear-gradient(90deg,#e377aa,#ff9cc8); border-radius: 999px; }
+progress::-moz-progress-bar { background: #e377aa; border-radius: 999px; }
+details { margin-top: 14px; border-top: 1px solid #f7d7e5; padding-top: 10px; font-size: .9rem; }
+summary { cursor: pointer; color: #935370; } ol { padding-left: 1.35rem; } li { margin: 5px 0; }
+@media (max-width: 520px) {
+  main { padding-top: 34px; } .filters { gap: 6px; } .filters button { padding: 9px 13px; }
+}
 </style>
 </head>
 <body>
 <main>
-<header><p class="brand">HillaryIsDancing 🎀</p><h1>Achievements</h1></header>
+<header class="hero">
+<h1 class="wordmark" aria-label="Hindex Achievements">Hindex <span class="bear" aria-hidden="true">ʕ•ᴥ•ʔ</span></h1>
+<p class="subtitle">Achievements in Hillary’s K-pop dance archive.</p>
+</header>
 <div class="filters" role="group" aria-label="Filter achievements">
 <button data-filter="all" aria-pressed="true">ALL</button>
 <button data-filter="unlocked" aria-pressed="false">UNLOCKED</button>
@@ -92,7 +130,7 @@ function render(){
  if(records===null)return;
  const visible=records.filter(r=>selected==='all'||(selected==='unlocked')===r.unlocked);
  cards.replaceChildren(...visible.map(card));
- statusLine.textContent=visible.length?'':({all:'No achievements yet.',unlocked:'No achievements unlocked yet.',locked:'No locked achievements.'})[selected];
+ statusLine.textContent=visible.length?'Showing '+visible.length+' of '+records.length+' achievement'+(records.length===1?'':'s'):({all:'No achievements yet.',unlocked:'No achievements unlocked yet.',locked:'No locked achievements.'})[selected];
 }
 filters.forEach(b=>b.addEventListener('click',()=>{selected=b.dataset.filter;render()}));
 async function start(){
