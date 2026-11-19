@@ -15,14 +15,6 @@
     "icon": "🏆"
   },
   {
-    "id": "unique_people_10",
-    "title": "People Collector I",
-    "description": "Cover 10 different people.",
-    "type": "unique_people",
-    "target": 10,
-    "icon": "✨"
-  },
-  {
     "id": "achievement_7049d740-7e17-4596-ad3a-558c2debdf8f",
     "title": "Who's your bias?",
     "type": "rule_set",
