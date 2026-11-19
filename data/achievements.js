@@ -21,6 +21,70 @@
     ],
     "description": "Cover Wonhee’s role in 6 different performances. Group: ILLIT.",
     "icon": "🏆"
+  },
+  {
+    "id": "achievement_b306bdd8-6a17-4425-b01b-3c2fe3ed70b3",
+    "title": "One In A Million",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "artist_times",
+        "target": 1,
+        "scopeGroup": "twice",
+        "personId": "chaeyoung"
+      },
+      {
+        "type": "artist_times",
+        "target": 1,
+        "scopeGroup": "twice",
+        "personId": "dahyun"
+      },
+      {
+        "type": "artist_times",
+        "target": 1,
+        "scopeGroup": "twice",
+        "personId": "jeongyeon"
+      },
+      {
+        "type": "artist_times",
+        "target": 1,
+        "scopeGroup": "twice",
+        "personId": "jihyo"
+      },
+      {
+        "type": "artist_times",
+        "target": 1,
+        "scopeGroup": "twice",
+        "personId": "mina"
+      },
+      {
+        "type": "artist_times",
+        "target": 1,
+        "scopeGroup": "twice",
+        "personId": "momo"
+      },
+      {
+        "type": "artist_times",
+        "target": 1,
+        "scopeGroup": "twice",
+        "personId": "nayeon"
+      },
+      {
+        "type": "artist_times",
+        "target": 1,
+        "scopeGroup": "twice",
+        "personId": "sana"
+      },
+      {
+        "type": "artist_times",
+        "target": 1,
+        "scopeGroup": "twice",
+        "personId": "tzuyu"
+      }
+    ],
+    "description": "Cover Chaeyoung’s role in 1 different performances. Group: TWICE. AND Cover Dahyun’s role in 1 different performances. Group: TWICE. AND Cover Jeongyeon’s role in 1 different performances. Group: TWICE. AND Cover Jihyo’s role in 1 different performances. Group: TWICE. AND Cover Mina’s role in 1 different performances. Group: TWICE. AND Cover Momo’s role in 1 different performances. Group: TWICE. AND Cover Nayeon’s role in 1 different performances. Group: TWICE. AND Cover Sana’s role in 1 different performances. Group: TWICE. AND Cover Tzuyu’s role in 1 different performances. Group: TWICE.",
+    "icon": "🏆"
   }
 ];
 
