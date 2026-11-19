@@ -7,14 +7,6 @@
 
   const achievements = [
   {
-    "id": "twice_all_members",
-    "title": "ONE IN A MILLION",
-    "description": "Cover every officially debuted TWICE member at least once.",
-    "type": "cover_all_group_members",
-    "groupId": "twice",
-    "icon": "🏆"
-  },
-  {
     "id": "achievement_7049d740-7e17-4596-ad3a-558c2debdf8f",
     "title": "Who's your bias?",
     "type": "rule_set",
