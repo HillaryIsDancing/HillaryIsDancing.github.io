@@ -13,61 +13,11 @@
     "match": "all",
     "conditions": [
       {
-        "type": "artist_times",
-        "target": 1,
-        "scopeGroup": "twice",
-        "personId": "chaeyoung"
-      },
-      {
-        "type": "artist_times",
-        "target": 1,
-        "scopeGroup": "twice",
-        "personId": "dahyun"
-      },
-      {
-        "type": "artist_times",
-        "target": 1,
-        "scopeGroup": "twice",
-        "personId": "jeongyeon"
-      },
-      {
-        "type": "artist_times",
-        "target": 1,
-        "scopeGroup": "twice",
-        "personId": "jihyo"
-      },
-      {
-        "type": "artist_times",
-        "target": 1,
-        "scopeGroup": "twice",
-        "personId": "mina"
-      },
-      {
-        "type": "artist_times",
-        "target": 1,
-        "scopeGroup": "twice",
-        "personId": "momo"
-      },
-      {
-        "type": "artist_times",
-        "target": 1,
-        "scopeGroup": "twice",
-        "personId": "nayeon"
-      },
-      {
-        "type": "artist_times",
-        "target": 1,
-        "scopeGroup": "twice",
-        "personId": "sana"
-      },
-      {
-        "type": "artist_times",
-        "target": 1,
-        "scopeGroup": "twice",
-        "personId": "tzuyu"
+        "type": "cover_all_group_members",
+        "groupId": "twice"
       }
     ],
-    "description": "Cover Chaeyoung’s role in 1 different performances. Group: TWICE. AND Cover Dahyun’s role in 1 different performances. Group: TWICE. AND Cover Jeongyeon’s role in 1 different performances. Group: TWICE. AND Cover Jihyo’s role in 1 different performances. Group: TWICE. AND Cover Mina’s role in 1 different performances. Group: TWICE. AND Cover Momo’s role in 1 different performances. Group: TWICE. AND Cover Nayeon’s role in 1 different performances. Group: TWICE. AND Cover Sana’s role in 1 different performances. Group: TWICE. AND Cover Tzuyu’s role in 1 different performances. Group: TWICE.",
+    "description": "Cover every officially debuted member of TWICE. Count roles in this group.",
     "icon": "🏆"
   },
   {
