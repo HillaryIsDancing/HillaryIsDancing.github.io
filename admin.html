@@ -230,10 +230,10 @@ function countCoverMilestone(rule, dances, data) {
 }
 
 const ruleLabels = {
- distinct_songs:'Different songs covered', artist_times:'Times covering an artist',
- distinct_groups:'Different groups covered', complete_groups:'Groups with every role covered',
- group_songs:'Different songs by one group', unique_people:'Different individual artists covered',
- cover_all_group_members:'Cover every member of a selected group'
+ distinct_songs:'Unique songs', artist_times:'Performances as artist',
+ distinct_groups:'Unique groups', complete_groups:'Completed groups',
+ group_songs:'Songs by group', unique_people:'Unique artists',
+ cover_all_group_members:'Full group lineup'
 };
 function readDefinitions(source) {
  const declaration = /^\s*const achievements\s*=\s*(?=\[)/m.exec(source);
@@ -310,6 +310,23 @@ function evaluateRuleSet(achievement,dances,data){
 function achievementForm(original){
  const db=unpack(snapshot.files),panel=$('panel'),form=el('form');
  panel.replaceChildren(el('h2',original?'Edit Achievement':'Add Achievement'),form);
+ if(original){
+  const removeAchievement=button('Delete Achievement',()=>{
+   const destination=demo?'this preview':session.repo+' / '+session.branch;
+   if(!confirm('Delete “'+original.title+'” from '+destination+'?'))return;
+   run(async()=>{
+    const {start,end,rules}=readDefinitions(snapshot.files.achievements);
+    const index=rules.findIndex(item=>item.id===original.id);
+    if(index<0)fail('Achievement no longer exists.');
+    rules.splice(index,1);
+    const previous=snapshot.files.achievements;
+    const source=previous.slice(0,start)+JSON.stringify(rules,null,2)+previous.slice(end);
+    if(demo){snapshot.files.achievements=source;render();$('status').textContent='Deleted from preview · '+original.title;return}
+    await writeChange('Delete achievement · '+original.title,null,{...snapshot.files,achievements:source});
+   });
+  });
+  removeAchievement.className='danger';panel.append(removeAchievement);
+ }
  const conditions=original?.type==='rule_set'?structuredClone(original.conditions):original?[Object.fromEntries(['type','target','personId','groupId'].filter(k=>original[k]!==undefined).map(k=>[k,original[k]]))]:[];
  if(original?.type==='cover_all_group_members')conditions[0].legacyRoster=true;
  if(conditions.some(c=>!Object.hasOwn(ruleLabels,c.type))){form.append(el('p','This custom rule uses its original evaluator.'));return}
@@ -331,8 +348,11 @@ function achievementForm(original){
  const label=c=>ruleText(c.type,c.target,db.people[c.personId]?.name||'…',db.groups[c.groupId]?.name||'…')+
  (c.scopeGroup?' Group: '+db.groups[c.scopeGroup]?.name+'.':'')+(c.scopePerson?' Artist: '+db.people[c.scopePerson]?.name+'.':'')+
  (c.type==='cover_all_group_members'?(c.legacyRoster?' Count appearances in any group.':' Count roles in this group.'):'');
+ function shortLabel(c){
+  return [ruleLabels[c.type],db.groups[c.groupId||c.scopeGroup]?.name,db.people[c.personId||c.scopePerson]?.name,c.target].filter(Boolean).join(' · ');
+ }
  function refresh(){
-  applied.replaceChildren();conditions.forEach((c,i)=>applied.add(new Option((i+1)+'. '+label(c),String(i))));applied.value=String(index);
+  applied.replaceChildren();conditions.forEach((c,i)=>applied.add(new Option((i+1)+'. '+shortLabel(c),String(i))));applied.value=String(index);
   remove.disabled=index<0;
   summary.replaceChildren(el('h3','Unlock preview'));
   if(!conditions.length){summary.append(el('p','Select a rule and press + to start.'));return}
@@ -344,14 +364,28 @@ function achievementForm(original){
   settings.replaceChildren();const c=conditions[index];settings.hidden=!c;
   if(!c){refresh();return}
   settings.append(el('legend',ruleLabels[c.type]));
+  const groupKey=['group_songs','cover_all_group_members'].includes(c.type)?'groupId':'scopeGroup';
+  const personKey=c.type==='artist_times'?'personId':'scopePerson';
+  const memberOptions=()=>c[groupKey]?people.filter(([id])=>db.groups[c[groupKey]]?.memberIds.includes(id)):people;
   const pick=(name,key,choices,empty)=>{
    const control=select(settings,name,[[ '',empty],...choices],c[key]||'');
-   control.onchange=()=>{if(control.value)c[key]=control.value;else delete c[key];refresh()};
+   if(key===personKey&&c[key]&&!choices.some(([id])=>id===c[key]))control.selectedIndex=-1;
+   control.onchange=()=>{
+    if(control.value)c[key]=control.value;else delete c[key];
+    if(key===groupKey){
+     if(c[personKey]&&!memberOptions().some(([id])=>id===c[personKey]))delete c[personKey];
+     edit();return;
+    }
+    refresh();
+   };
   };
   if(['group_songs','cover_all_group_members'].includes(c.type))pick('Group','groupId',groups,'Select group');
   else pick('Group filter','scopeGroup',groups,'All groups and solo performances');
-  if(c.type==='artist_times')pick('Artist','personId',people,'Select artist');
-  else if(c.type!=='cover_all_group_members')pick('Artist filter','scopePerson',people,'All artists');
+  if(c.type==='artist_times')pick('Artist','personId',memberOptions(),'Select artist');
+  else if(c.type!=='cover_all_group_members')pick('Artist filter','scopePerson',memberOptions(),c[groupKey]?'All members':'All artists');
+  if(c[personKey]&&!memberOptions().some(([id])=>id===c[personKey])){
+   settings.append(el('p','Previously selected artist ('+(db.people[c[personKey]]?.name||c[personKey])+') is outside this lineup. Choose a member or change the group.'));
+  }
   if(c.type==='cover_all_group_members'){
    const mode=select(settings,'Count member roles from',[['group','This group’s performances'],['all','All performances']],c.legacyRoster?'all':'group');
    mode.onchange=()=>{c.legacyRoster=mode.value==='all';refresh()};
@@ -371,6 +405,8 @@ function achievementForm(original){
   for(const [i,c] of conditions.entries()){
    const invalid=msg=>fail('Rule '+(i+1)+': '+msg);
    if(['group_songs','cover_all_group_members'].includes(c.type)&&!db.groups[c.groupId])invalid('Select a group.');
+   const group=c.groupId||c.scopeGroup,person=c.personId||c.scopePerson;
+   if(group&&person&&!db.groups[group]?.memberIds.includes(person))invalid('Choose a member of the selected group or change the group.');
    if(c.type==='artist_times'&&!db.people[c.personId])invalid('Select an artist.');
    if(c.type==='cover_all_group_members'){const g=db.groups[c.groupId];if(!g.membershipComplete||g.memberIds.length<(c.legacyRoster?1:2))invalid('Choose a group with a complete eligible lineup.')}
    else if(!Number.isSafeInteger(c.target)||c.target<1)invalid('Enter a positive whole number.');
