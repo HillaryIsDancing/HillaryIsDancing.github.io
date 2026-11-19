@@ -6,42 +6,55 @@
   const root = window.HID_DATA = window.HID_DATA || {};
 
   const achievements = [
-    {
-      id: "twice_all_members",
-      title: "ONE IN A MILLION",
-      description: "Cover every officially debuted TWICE member at least once.",
-      type: "cover_all_group_members",
-      groupId: "twice",
-      icon: "🏆"
-    },
-
-    {
-      id: "unique_people_10",
-      title: "People Collector I",
-      description: "Cover 10 different people.",
-      type: "unique_people",
-      target: 10,
-      icon: "✨"
-    },
-
-    {
-      id: "unique_people_25",
-      title: "People Collector II",
-      description: "Cover 25 different people.",
-      type: "unique_people",
-      target: 25,
-      icon: "🌟"
-    },
-
-    {
-      id: "unique_people_50",
-      title: "People Collector III",
-      description: "Cover 50 different people.",
-      type: "unique_people",
-      target: 50,
-      icon: "💫"
-    }
-  ];
+  {
+    "id": "twice_all_members",
+    "title": "ONE IN A MILLION",
+    "description": "Cover every officially debuted TWICE member at least once.",
+    "type": "cover_all_group_members",
+    "groupId": "twice",
+    "icon": "🏆"
+  },
+  {
+    "id": "unique_people_10",
+    "title": "People Collector I",
+    "description": "Cover 10 different people.",
+    "type": "unique_people",
+    "target": 10,
+    "icon": "✨"
+  },
+  {
+    "id": "unique_people_25",
+    "title": "People Collector II",
+    "description": "Cover 25 different people.",
+    "type": "unique_people",
+    "target": 25,
+    "icon": "🌟"
+  },
+  {
+    "id": "unique_people_50",
+    "title": "People Collector III",
+    "description": "Cover 50 different people.",
+    "type": "unique_people",
+    "target": 50,
+    "icon": "💫"
+  },
+  {
+    "id": "achievement_7049d740-7e17-4596-ad3a-558c2debdf8f",
+    "title": "Who's your bias?",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "artist_times",
+        "target": 6,
+        "scopeGroup": "illit",
+        "personId": "wonhee"
+      }
+    ],
+    "description": "Cover Wonhee’s role in 6 different performances. Group: ILLIT.",
+    "icon": "🏆"
+  }
+];
 
   function uniquePersonIds(dances) {
     return new Set(
@@ -99,7 +112,61 @@
     };
   }
 
-  function evaluateAchievement(achievement, dances) {
+  function countCoverMilestone(rule, dances, data) {
+ const songs = new Set(), groups = new Set(), performances = new Set(), roles = new Map();
+ const clean = value => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+ for (const [i, dance] of (dances || []).entries()) {
+  const group = data.groups?.[dance.groupId];
+  const title = clean(dance.songTitle);
+  const solo = data.resolveSoloArtistPersonId?.(dance.sourceArtistName);
+  const source = group ? 'group:'+group.id : dance.projectId ? 'project:'+dance.projectId : solo ? 'solo:'+solo : clean(dance.sourceArtistName);
+  if (title && source && (rule.type !== 'group_songs' || group?.id === rule.groupId)) {
+   songs.add(JSON.stringify([source,title]));
+  }
+  if (group) groups.add(group.id);
+  if (!dance.personId || clean(dance.roleName) === 'backup') continue;
+  if (dance.personId === rule.personId) performances.add(dance.videoId || dance.id || i);
+  if (group) {
+   if (!roles.has(group.id)) roles.set(group.id,new Set());
+   roles.get(group.id).add(dance.personId);
+  }
+ }
+ if (rule.type === 'artist_times') return performances.size;
+ if (rule.type === 'distinct_groups') return groups.size;
+ if (rule.type === 'complete_groups') {
+  return Object.values(data.groups || {}).filter(group => {
+   const ids = new Set(group.memberIds);
+   return group.membershipComplete && ids.size > 1 && [...ids].every(id => roles.get(group.id)?.has(id));
+  }).length;
+ }
+ return songs.size;
+}
+
+  function evaluateRuleSet(achievement,dances,data){
+ const results=achievement.conditions.map(rule=>{
+  const rows=(dances||[]).filter(row=>(!rule.scopeGroup||row.groupId===rule.scopeGroup)&&(!rule.scopePerson||row.personId===rule.scopePerson));
+  let total=rule.target, actual;
+  if(rule.type==='cover_all_group_members'){
+   const group=data.groups[rule.groupId],members=[...new Set(group?.memberIds||[])];
+   const seen=new Set(rows.filter(d=>rule.legacyRoster||(d.groupId===rule.groupId&&String(d.roleName||'').toLowerCase()!=='backup')).map(d=>d.personId));
+   total=members.length;actual=members.filter(id=>seen.has(id)).length;
+   return {current:actual,total,unlocked:!!group?.membershipComplete&&total>(rule.legacyRoster?0:1)&&actual===total};
+  }
+  if(rule.type==='unique_people')actual=new Set(rows.map(d=>d.personId).filter(Boolean)).size;
+  else actual=countCoverMilestone(rule,rows,data);
+  return {current:Math.min(total,actual),total,unlocked:total>0&&actual>=total};
+ });
+ const done=results.filter(r=>r.unlocked).length,total=achievement.match==='any'?1:results.length;
+ const progress=results.length===1?results[0]:{current:Math.min(done,total),total,unlocked:results.length>0&&done>=total};
+ return {...achievement,...progress,conditionProgress:results};
+}
+function evaluateAchievement(achievement, dances) {
+    if(achievement.type==='rule_set') return evaluateRuleSet(achievement,dances,root);
+    if (['artist_times','distinct_groups','complete_groups','group_songs','distinct_songs'].includes(achievement.type)) {
+      const actual = countCoverMilestone(achievement, dances, root);
+      const total = achievement.target;
+      return { ...achievement, actual, total, current: Math.min(actual,total), unlocked: total > 0 && actual >= total };
+    }
     let progress;
 
     switch (achievement.type) {
