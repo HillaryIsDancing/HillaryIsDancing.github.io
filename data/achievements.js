@@ -35,6 +35,21 @@
     ],
     "description": "Cover Wonhee’s role in 6 different performances. Group: ILLIT.",
     "icon": "🏆"
+  },
+  {
+    "id": "achievement_7f2d57ba-9944-4496-8055-9dd89341fa46",
+    "title": "Who's your bias?",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "group_songs",
+        "target": 10,
+        "groupId": "illit"
+      }
+    ],
+    "description": "Cover 10 different songs by ILLIT.",
+    "icon": "🏆"
   }
 ];
 
