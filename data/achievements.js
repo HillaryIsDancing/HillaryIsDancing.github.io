@@ -7,22 +7,6 @@
 
   const achievements = [
   {
-    "id": "achievement_7049d740-7e17-4596-ad3a-558c2debdf8f",
-    "title": "Who's your bias?",
-    "type": "rule_set",
-    "match": "all",
-    "conditions": [
-      {
-        "type": "artist_times",
-        "target": 6,
-        "scopeGroup": "illit",
-        "personId": "wonhee"
-      }
-    ],
-    "description": "Cover Wonhee’s role in 6 different performances. Group: ILLIT.",
-    "icon": "🏆"
-  },
-  {
     "id": "achievement_b306bdd8-6a17-4425-b01b-3c2fe3ed70b3",
     "title": "One In A Million",
     "type": "rule_set",
