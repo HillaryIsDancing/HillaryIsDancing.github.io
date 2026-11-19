@@ -3,7 +3,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
 <title>Artists, Groups &amp; Achievements · HillaryIsDancing</title>
 <style>
+[hidden]{display:none!important}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(at top left,#ffdaeb,transparent 40%),linear-gradient(#fff8fc,#ffeef6,#fff6fb);min-height:100vh;font:16px Arial,Helvetica,sans-serif;color:#5b4350}main{max-width:1060px;margin:auto;padding:36px 20px}header,nav{text-align:center}header small{color:#aa456f;letter-spacing:.16em;font-weight:bold}h1{color:#6b3f53;font-size:clamp(26px,4vw,46px);margin:8px 0 18px}h2,h3{margin:0 0 14px}button,input,select,textarea{font:inherit}button{cursor:pointer;padding:10px 17px;border:1px solid #e4adca;border-radius:24px;background:white;color:#783c58;font-weight:700}button:hover,button.active,.primary{background:#ffd4e7}button:disabled{opacity:.55;cursor:wait}article,details{background:#fffcfe;border:2px solid #f7d7e5;border-radius:22px;padding:22px;box-shadow:0 9px 22px #dfb1c51c}details{margin:22px 0 12px}summary{cursor:pointer;font-weight:bold}label{display:block;font-weight:bold;margin:14px 0}input,select,textarea{display:block;width:100%;padding:10px 13px;border:1px solid #dfb4c8;border-radius:12px;background:white;color:#523644;margin:6px 0}textarea{resize:vertical}#status{white-space:pre-wrap;overflow-wrap:anywhere}#layout{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(300px,1.4fr);gap:16px}.bar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}#rows{max-height:460px;overflow:auto}#rows button{display:block;width:100%;text-align:left;margin:5px 0;border-radius:12px}.hint{font-size:14px;color:#78596a;line-height:1.5}.member{display:flex;align-items:center;gap:8px;margin:6px 0}.member input{flex:1;min-width:0}.member span{flex:1}.danger{color:#943347}nav button{min-width:110px;margin:4px}button:focus-visible,input:focus-visible{outline:3px solid #bd5b89} @media(max-width:700px){#layout{grid-template-columns:1fr}#rows{max-height:180px}}
+main:has(.ruleboard){max-width:1360px}#layout:has(.ruleboard){grid-template-columns:minmax(190px,1fr) minmax(0,3.5fr)}.ruleboard{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1.25fr);gap:10px;align-items:center}.ruleboard select{padding:6px;min-height:160px}.ruleboard option{padding:5px}.transfer{display:grid;gap:8px}fieldset{min-width:0;border:1px solid #e4adca;border-radius:14px;margin:14px 0;padding:10px 16px}legend{font-weight:bold;color:#783c58}form>div:has(>h3){margin:16px 0;line-height:1.45} @media(max-width:800px){#layout:has(.ruleboard){grid-template-columns:1fr}} @media(max-width:560px){.ruleboard{grid-template-columns:1fr}.transfer{display:flex}.ruleboard label{margin:4px 0}.ruleboard select{min-height:100px}}
 </style>
 <main><header><small>ADMIN</small><h1>🧸 HillaryIsDancing 🎀</h1></header>
 <details id="connection" open><summary>GitHub connection</summary>
@@ -80,7 +82,7 @@ async function writeChange(title,mutate,files){
 }
 async function run(fn){
  if(busy)return;busy=true;$('workspace').inert=true;$('connection').inert=true;$('status').textContent='Working…';
- try{await fn()}catch(e){$('status').textContent=e.message+'  Reopen the database to refresh before retrying.';if(!snapshot){$('workspace').hidden=true;$('connection').open=true}}
+ try{await fn()}catch(e){$('status').textContent=e.message+(snapshot?'':'  Reopen the database to refresh before retrying.');if(!snapshot){$('workspace').hidden=true;$('connection').open=true}}
  finally{busy=false;$('workspace').inert=false;$('connection').inert=false}
 }
 $('connect').onsubmit=e=>{e.preventDefault();run(async()=>{
@@ -121,13 +123,13 @@ function detail(id){
  if(!confirm('Delete '+r.name+' ('+id+') from '+session.repo+' / '+session.branch+'? '+(artist?'This removes their group memberships.':'Member artist records will be kept.')+' Historical cover matches may change.'))return;
  run(()=>writeChange('Delete '+r.name,d=>{
  if(artist){
-  if(readDefinitions(snapshot.files.achievements).rules.some(rule=>rule.personId===id))fail('An achievement uses this artist. Change its condition before deleting.');
+  if(readDefinitions(snapshot.files.achievements).rules.some(rule=>rule.personId===id||rule.conditions?.some(c=>c.personId===id||c.scopePerson===id)))fail('An achievement uses this artist. Change its condition before deleting.');
   if(Object.values(d.projects).some(p=>p.participantIds?.includes(id)))fail('This artist is referenced by a collaboration project.');
   for(const g of Object.values(d.groups))for(const f of memberFields)if(g[f])g[f]=g[f].filter(x=>x!==id);
   delete d.people[id];dropAliases(d.soloArtistAliases,id);
  }else{
   if(Object.values(d.groups).some(g=>g.parentGroupId===id))fail('A sub-unit still uses this parent group.');
-  const refs=[...snapshot.files.achievements.matchAll(/["']?groupId["']?\s*:\s*["']([^"']+)["']/g)];
+  const refs=[...snapshot.files.achievements.matchAll(/["']?(?:groupId|scopeGroup)["']?\s*:\s*["']([^"']+)["']/g)];
   if(refs.some(m=>m[1]===id))fail('An existing achievement uses this group.');
   delete d.groups[id];dropAliases(d.groupAliases,id);
  }
@@ -231,7 +233,7 @@ const ruleLabels = {
  distinct_songs:'Different songs covered', artist_times:'Times covering an artist',
  distinct_groups:'Different groups covered', complete_groups:'Groups with every role covered',
  group_songs:'Different songs by one group', unique_people:'Different individual artists covered',
- cover_all_group_members:'Every member of one group (existing rule)'
+ cover_all_group_members:'Cover every member of a selected group'
 };
 function readDefinitions(source) {
  const declaration = /^\s*const achievements\s*=\s*(?=\[)/m.exec(source);
@@ -262,6 +264,11 @@ function updateRules(source, rules) {
       return { ...achievement, actual, total, current: Math.min(actual,total), unlocked: total > 0 && actual >= total };
     }`);
  }
+ if(!result.includes('function evaluateRuleSet(')){
+  const entry='function evaluateAchievement(achievement, dances) {';
+  if(!result.includes(entry))fail('Unrecognized achievement evaluator.');
+  result=result.replace(entry,()=>evaluateRuleSet.toString()+'\n'+entry+"\n    if(achievement.type==='rule_set') return evaluateRuleSet(achievement,dances,root);");
+ }
  return result;
 }
 function ruleList(){
@@ -282,46 +289,98 @@ function ruleText(type,target,person,group){
   default:return 'Cover '+target+' different songs.';
  }
 }
+function evaluateRuleSet(achievement,dances,data){
+ const results=achievement.conditions.map(rule=>{
+  const rows=(dances||[]).filter(row=>(!rule.scopeGroup||row.groupId===rule.scopeGroup)&&(!rule.scopePerson||row.personId===rule.scopePerson));
+  let total=rule.target, actual;
+  if(rule.type==='cover_all_group_members'){
+   const group=data.groups[rule.groupId],members=[...new Set(group?.memberIds||[])];
+   const seen=new Set(rows.filter(d=>rule.legacyRoster||(d.groupId===rule.groupId&&String(d.roleName||'').toLowerCase()!=='backup')).map(d=>d.personId));
+   total=members.length;actual=members.filter(id=>seen.has(id)).length;
+   return {current:actual,total,unlocked:!!group?.membershipComplete&&total>(rule.legacyRoster?0:1)&&actual===total};
+  }
+  if(rule.type==='unique_people')actual=new Set(rows.map(d=>d.personId).filter(Boolean)).size;
+  else actual=countCoverMilestone(rule,rows,data);
+  return {current:Math.min(total,actual),total,unlocked:total>0&&actual>=total};
+ });
+ const done=results.filter(r=>r.unlocked).length,total=achievement.match==='any'?1:results.length;
+ const progress=results.length===1?results[0]:{current:Math.min(done,total),total,unlocked:results.length>0&&done>=total};
+ return {...achievement,...progress,conditionProgress:results};
+}
 function achievementForm(original){
  const db=unpack(snapshot.files),panel=$('panel'),form=el('form');
  panel.replaceChildren(el('h2',original?'Edit Achievement':'Add Achievement'),form);
- if(original&&!Object.hasOwn(ruleLabels,original.type)){form.append(el('p','This custom rule is managed by its original evaluator.'));return}
+ const conditions=original?.type==='rule_set'?structuredClone(original.conditions):original?[Object.fromEntries(['type','target','personId','groupId'].filter(k=>original[k]!==undefined).map(k=>[k,original[k]]))]:[];
+ if(original?.type==='cover_all_group_members')conditions[0].legacyRoster=true;
+ if(conditions.some(c=>!Object.hasOwn(ruleLabels,c.type))){form.append(el('p','This custom rule uses its original evaluator.'));return}
  const title=field(form,'Achievement name',el('input'));title.required=true;title.value=original?.title||'';
- const type=field(form,'Completion rule',el('select'));
- for(const [k,v] of Object.entries(ruleLabels))type.add(new Option(v,k));
- type.value=original?.type||'distinct_songs';
- const selector=(label,records,selected)=>{
-  const node=field(form,label,el('select'));
-  for(const r of Object.values(records).sort((a,b)=>a.name.localeCompare(b.name)))node.add(new Option(r.name+' · '+r.id,r.id));
-  if(selected)node.value=selected;return node;
- };
- const person=selector('Artist',db.people,original?.personId),group=selector('Group',db.groups,original?.groupId);
- const target=field(form,'Unlock at',el('input'));target.type='number';target.min='1';target.step='1';target.value=original?.target||1;
- const preview=el('p');preview.className='hint';form.append(preview);
- const progress=el('p');if(demo)form.append(progress);
- function refresh(){
-  person.parentElement.hidden=type.value!=='artist_times';
-  group.parentElement.hidden=!['group_songs','cover_all_group_members'].includes(type.value);
-  target.parentElement.hidden=type.value==='cover_all_group_members';target.disabled=target.parentElement.hidden;
-  preview.textContent=ruleText(type.value,target.value,db.people[person.value]?.name,db.groups[group.value]?.name);
-  if(demo){const actual=demoCount({type:type.value,groupId:group.value,personId:person.value});const goal=target.disabled?db.groups[group.value]?.memberIds.length:Number(target.value);progress.textContent='Sample progress · '+actual+' / '+goal+(actual>=goal&&goal>0?' · Unlocked':'');}
+ function select(parent,label,options,value){
+  const control=field(parent,label,el('select'));
+  for(const [id,name] of options)control.add(new Option(name,id));
+  if(value!==undefined)control.value=value;return control;
  }
- form.oninput=refresh;refresh();
+ const match=select(form,'Unlock when',[['all','All applied rules are met (AND)'],['any','Any applied rule is met (OR)']],original?.match||'all');
+ const board=el('div');board.className='ruleboard';form.append(board);
+ const library=select(board,'Available rules',Object.entries(ruleLabels));library.size=7;library.value='distinct_songs';
+ const actions=el('div');actions.className='transfer';board.append(actions);
+ const applied=select(board,'Applied rules',[]);applied.size=7;
+ const settings=el('fieldset'),summary=el('div');form.append(settings,summary);
+ const groups=Object.values(db.groups).sort((a,b)=>a.name.localeCompare(b.name)).map(g=>[g.id,g.name]);
+ const people=Object.values(db.people).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]);
+ let index=conditions.length?0:-1;
+ const label=c=>ruleText(c.type,c.target,db.people[c.personId]?.name||'…',db.groups[c.groupId]?.name||'…')+
+ (c.scopeGroup?' Group: '+db.groups[c.scopeGroup]?.name+'.':'')+(c.scopePerson?' Artist: '+db.people[c.scopePerson]?.name+'.':'')+
+ (c.type==='cover_all_group_members'?(c.legacyRoster?' Count appearances in any group.':' Count roles in this group.'):'');
+ function refresh(){
+  applied.replaceChildren();conditions.forEach((c,i)=>applied.add(new Option((i+1)+'. '+label(c),String(i))));applied.value=String(index);
+  remove.disabled=index<0;
+  summary.replaceChildren(el('h3','Unlock preview'));
+  if(!conditions.length){summary.append(el('p','Select a rule and press + to start.'));return}
+  const preview=demo?evaluateRuleSet({conditions,match:match.value},sampleDances,db):null;
+  conditions.forEach((c,i)=>{const r=preview?.conditionProgress[i];summary.append(el('p',(i?(match.value==='all'?'AND · ':'OR · '):'')+label(c)+(r?' · '+r.current+' / '+r.total:'')))});
+  if(preview)summary.append(el('strong',preview.unlocked?'Sample result · Unlocked':'Sample result · Locked'));
+ }
+ function edit(){
+  settings.replaceChildren();const c=conditions[index];settings.hidden=!c;
+  if(!c){refresh();return}
+  settings.append(el('legend',ruleLabels[c.type]));
+  const pick=(name,key,choices,empty)=>{
+   const control=select(settings,name,[[ '',empty],...choices],c[key]||'');
+   control.onchange=()=>{if(control.value)c[key]=control.value;else delete c[key];refresh()};
+  };
+  if(['group_songs','cover_all_group_members'].includes(c.type))pick('Group','groupId',groups,'Select group');
+  else pick('Group filter','scopeGroup',groups,'All groups and solo performances');
+  if(c.type==='artist_times')pick('Artist','personId',people,'Select artist');
+  else if(c.type!=='cover_all_group_members')pick('Artist filter','scopePerson',people,'All artists');
+  if(c.type==='cover_all_group_members'){
+   const mode=select(settings,'Count member roles from',[['group','This group’s performances'],['all','All performances']],c.legacyRoster?'all':'group');
+   mode.onchange=()=>{c.legacyRoster=mode.value==='all';refresh()};
+  }else{
+   const target=field(settings,'Unlock at',el('input'));target.type='number';target.min='1';target.step='1';target.value=c.target;
+   target.oninput=()=>{c.target=Number(target.value);refresh()};
+  }
+  refresh();
+ }
+ const add=button('+',()=>{if(!library.value)return;const type=library.value;conditions.push(type==='cover_all_group_members'?{type}:{type,target:1});index=conditions.length-1;edit()});
+ const remove=button('−',()=>{if(index<0)return;conditions.splice(index,1);index=Math.min(index,conditions.length-1);edit()});
+ add.setAttribute('aria-label','Add selected rule');remove.setAttribute('aria-label','Remove selected rule');actions.append(add,remove);
+ applied.onchange=()=>{index=Number(applied.value);edit()};match.onchange=refresh;edit();
  const save=el('button',demo?'Save preview achievement':'Save to database');save.className='primary';form.append(save);
  form.onsubmit=e=>{e.preventDefault();run(async()=>{
-  refresh();const name=title.value.trim();if(!name)fail('Enter an achievement name.');
-  const value=Number(target.value);
-  if(!target.disabled&&(!Number.isSafeInteger(value)||value<1))fail('Enter a positive whole number.');
+  const name=title.value.trim();if(!name||!conditions.length)fail('Enter a name and add at least one rule.');
+  for(const [i,c] of conditions.entries()){
+   const invalid=msg=>fail('Rule '+(i+1)+': '+msg);
+   if(['group_songs','cover_all_group_members'].includes(c.type)&&!db.groups[c.groupId])invalid('Select a group.');
+   if(c.type==='artist_times'&&!db.people[c.personId])invalid('Select an artist.');
+   if(c.type==='cover_all_group_members'){const g=db.groups[c.groupId];if(!g.membershipComplete||g.memberIds.length<(c.legacyRoster?1:2))invalid('Choose a group with a complete eligible lineup.')}
+   else if(!Number.isSafeInteger(c.target)||c.target<1)invalid('Enter a positive whole number.');
+  }
   const defs=readDefinitions(snapshot.files.achievements).rules;
-  const record={...original,id:original?.id||'achievement_'+crypto.randomUUID(),title:name,type:type.value,description:preview.textContent,icon:original?.icon||'🏆'};
-  delete record.groupId;delete record.personId;delete record.target;
-  if(type.value==='cover_all_group_members'&&!db.groups[group.value]?.membershipComplete)fail('Choose a group with a verified lineup.');
-  if(!target.disabled)record.target=value;
-  if(!group.parentElement.hidden)record.groupId=group.value;
-  if(!person.parentElement.hidden)record.personId=person.value;
+  const record={...original,id:original?.id||'achievement_'+crypto.randomUUID(),title:name,type:'rule_set',match:match.value,conditions,description:conditions.map(label).join(match.value==='all'?' AND ':' OR '),icon:original?.icon||'🏆'};
+  delete record.target;delete record.personId;delete record.groupId;
   if(original)defs[defs.findIndex(r=>r.id===original.id)]=record;else defs.push(record);
   const source=updateRules(snapshot.files.achievements,defs);
-  if(demo){snapshot.files.achievements=source;render();$('status').textContent='Preview saved in this tab.';return}
+  if(demo){snapshot.files.achievements=source;render();achievementForm(record);$('status').textContent='Preview saved in this tab.';return}
   await writeChange('Save achievement · '+name,null,{...snapshot.files,achievements:source});
  })};
 }
@@ -332,11 +391,6 @@ const sampleDances=[
  {id:'d',groupId:'duo',personId:'lina',songTitle:'Glow'},
  {id:'e',groupId:'duo',personId:'mina_demo',songTitle:'Glow'}
 ];
-function demoCount(r){
- if(r.type==='unique_people')return new Set(sampleDances.map(d=>d.personId)).size;
- if(r.type==='cover_all_group_members')return new Set(sampleDances.filter(d=>d.groupId===r.groupId).map(d=>d.personId)).size;
- return countCoverMilestone(r,sampleDances,unpack(snapshot.files));
-}
 let demo=false;
 $('previewDemo').onclick=()=>{
  if(busy)return;demo=true;session=null;tab='achievements';
@@ -345,7 +399,8 @@ $('previewDemo').onclick=()=>{
  const people={};for(const g of Object.values(groups))for(const id of g.memberIds)people[id]={id,name:id==='mina_demo'?'Mina (Demo Duo)':id[0].toUpperCase()+id.slice(1)};
  const declaration=(name,obj)=>'const '+name+' = '+JSON.stringify(obj)+';\n';
  const defs=[['distinct_songs','Song Collector',5],['artist_times','Sana Spotlight',3],['distinct_groups','Group Explorer',5],['complete_groups','Full Lineup',1],['group_songs','TWICE · Five Songs',5]].map(([type,title,target])=>({id:type,type,title,target,...(type==='artist_times'?{personId:'sana'}:{}),...(type==='group_songs'?{groupId:'twice'}:{})}));
- snapshot={files:{groups:declaration('groups',groups)+declaration('groupAliases',{}),artists:declaration('people',people)+declaration('soloArtistAliases',{}),dances:declaration('projects',{}),achievements:'const achievements = '+JSON.stringify(defs)+';\nfunction countCoverMilestone(){}'}};
+ defs.unshift({id:'twice_all_members',type:'cover_all_group_members',groupId:'twice',title:'ONE IN A MILLION'});
+ snapshot={files:{groups:declaration('groups',groups)+declaration('groupAliases',{}),artists:declaration('people',people)+declaration('soloArtistAliases',{}),dances:declaration('projects',{}),achievements:'const achievements = '+JSON.stringify(defs)+';\nfunction evaluateAchievement(achievement, dances) {}'}};
  $('workspace').hidden=false;$('connection').open=false;$('search').value='';$('status').textContent='Preview · 5 sample performances. Changes stay in this tab. Open GitHub connection to use your database.';render();achievementForm(defs[0]);
 };
 
