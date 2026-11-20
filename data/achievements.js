@@ -94,6 +94,20 @@
     ],
     "description": "Cover 50 different songs.",
     "icon": "🏆"
+  },
+  {
+    "id": "achievement_33ebc591-5985-4780-a838-2a49334ccecc",
+    "title": "Kpop Idol",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "distinct_songs",
+        "target": 100
+      }
+    ],
+    "description": "Cover 100 different songs.",
+    "icon": "🏆"
   }
 ];
 
