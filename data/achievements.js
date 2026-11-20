@@ -50,6 +50,21 @@
     ],
     "description": "Cover 10 different songs by ILLIT.",
     "icon": "🏆"
+  },
+  {
+    "id": "achievement_a8b4338e-e0b5-4c35-b4c1-522bfc97f1fa",
+    "title": "Rescene, Yaho!",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "group_songs",
+        "target": 5,
+        "groupId": "rescene"
+      }
+    ],
+    "description": "Cover 5 different songs by RESCENE.",
+    "icon": "🏆"
   }
 ];
 
