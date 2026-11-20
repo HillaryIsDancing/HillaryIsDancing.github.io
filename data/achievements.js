@@ -108,6 +108,20 @@
     ],
     "description": "Cover 100 different songs.",
     "icon": "🏆"
+  },
+  {
+    "id": "achievement_5125fc23-456d-475d-837d-076624aa58aa",
+    "title": "Kpop Choreographer",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "distinct_songs",
+        "target": 150
+      }
+    ],
+    "description": "Cover 150 different songs.",
+    "icon": "🏆"
   }
 ];
 
