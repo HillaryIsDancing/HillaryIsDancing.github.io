@@ -122,6 +122,20 @@
     ],
     "description": "Cover 150 different songs.",
     "icon": "🏆"
+  },
+  {
+    "id": "achievement_90d06846-8aab-44b8-a970-e8337d52b2e8",
+    "title": "Kpop 대표",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "distinct_songs",
+        "target": 200
+      }
+    ],
+    "description": "Cover 200 different songs.",
+    "icon": "🏆"
   }
 ];
 
