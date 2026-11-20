@@ -80,6 +80,20 @@
     ],
     "description": "Cover 5 different songs by STAYC.",
     "icon": "🏆"
+  },
+  {
+    "id": "achievement_1db44956-523b-4d8c-be08-c5fdb7fe8931",
+    "title": "Kpop Trainee",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "distinct_songs",
+        "target": 50
+      }
+    ],
+    "description": "Cover 50 different songs.",
+    "icon": "🏆"
   }
 ];
 
