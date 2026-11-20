@@ -65,6 +65,21 @@
     ],
     "description": "Cover 5 different songs by RESCENE.",
     "icon": "🏆"
+  },
+  {
+    "id": "achievement_43af618d-5956-4238-8303-d2b709c4ee18",
+    "title": "It's Going Down!",
+    "type": "rule_set",
+    "match": "all",
+    "conditions": [
+      {
+        "type": "group_songs",
+        "target": 5,
+        "groupId": "stayc"
+      }
+    ],
+    "description": "Cover 5 different songs by STAYC.",
+    "icon": "🏆"
   }
 ];
 
